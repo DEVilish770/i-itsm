@@ -1,0 +1,83 @@
+classDiagram
+  direction TB
+  class Incident {
+    -IncidentStatus status
+    -state() IncidentState
+    +acknowledge()
+    +resolve(resolution)
+    +close(by, notes)
+    ~moveTo(next)
+    ~attachTechnician(t)
+    ~attachResolution(r)
+  }
+  class IncidentStates {
+    <<utility>>
+    +of(status)$ IncidentState
+  }
+  class IncidentState {
+    <<interface>>
+    +status() IncidentStatus
+    +allowedActions() Set~String~
+    +classify(i)
+    +assign(i, technician)
+    +acknowledge(i)
+    +startInvestigation(i)
+    +requestInfo(i)
+    +provideInfo(i)
+    +resolve(i, resolution)
+    +verify(i)
+    +reopen(i)
+    +close(i, by, notes)
+    +deny(action) InvalidStateTransitionException
+  }
+  note for IncidentState "Every method has a default implementation that throws InvalidStateTransitionException. Concrete states override only what they allow."
+  class NewState {
+    +classify(i)
+  }
+  class ClassifiedState {
+    +assign(i,t)
+  }
+  class AssignedState {
+    +acknowledge(i)
+    +assign(i,t)
+  }
+  class AcknowledgedState {
+    +startInvestigation(i)
+    +assign(i,t)
+  }
+  class InProgressState {
+    +requestInfo(i)
+    +resolve(i,r)
+    +assign(i,t)
+  }
+  class PendingInfoState {
+    +provideInfo(i)
+  }
+  class ResolvedState {
+    +verify(i)
+    +reopen(i)
+    +close(i,by,notes)
+  }
+  class VerifiedState {
+    +close(i,by,notes)
+  }
+  class ClosedState
+  IncidentState <|.. NewState
+  IncidentState <|.. ClassifiedState
+  IncidentState <|.. AssignedState
+  IncidentState <|.. AcknowledgedState
+  IncidentState <|.. InProgressState
+  IncidentState <|.. PendingInfoState
+  IncidentState <|.. ResolvedState
+  IncidentState <|.. VerifiedState
+  IncidentState <|.. ClosedState
+  Incident ..> IncidentStates : looks up state by status
+  IncidentStates o-- IncidentState : registry (EnumMap)
+  class ItsmException {
+    <<abstract>>
+    -HttpStatus status
+    -String code
+  }
+  class InvalidStateTransitionException
+  ItsmException <|-- InvalidStateTransitionException
+  IncidentState ..> InvalidStateTransitionException : throws

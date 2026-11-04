@@ -1,0 +1,35 @@
+flowchart TB
+  subgraph Client["Browser — React SPA (Vite)"]
+    UI[Pages: Login, Report, My incidents, Technician queue, Incident detail, Live dashboard, Admin config, Reports]
+    WSC[STOMP WebSocket client]
+  end
+  subgraph Backend["Spring Boot backend (Java 17)"]
+    direction TB
+    SEC[Security: JWT filter · BCrypt · role rules]
+    CTRL[REST controllers\nAuth · Incident · Catalog · Admin]
+    GEH[GlobalExceptionHandler\nuniform JSON errors]
+    SVC[Application services\nIncidentService · AssignmentService · SLAService · AdminService · ReportService · AuthService]
+    DOM[Domain model\nIncident aggregate · State pattern · Strategy pattern · value objects]
+    INT[Intelligence\nDuplicateDetection · CategorySuggestion · ResolutionSuggestion]
+    BUS[IncidentEventBus\nObserver pattern]
+    OBS1[AuditObserver]
+    OBS2[NotificationObserver → channels\nEmail adapter · SMS · In-app]
+    OBS3[DashboardBroadcastObserver]
+    MON[SLAMonitor @Scheduled\nwarnings · violations · auto-escalation]
+    REPO[Repositories\nSpring Data JPA + Specifications]
+    WSB[STOMP broker /topic]
+  end
+  DB[(PostgreSQL 16\n9 tables)]
+  UI -- "HTTPS /api/** (JSON + Bearer JWT)" --> SEC --> CTRL --> SVC
+  CTRL -.-> GEH
+  SVC --> DOM
+  SVC --> INT
+  SVC --> REPO --> DB
+  SVC --> BUS
+  MON --> REPO
+  MON --> BUS
+  BUS --> OBS1 --> REPO
+  BUS --> OBS2 --> REPO
+  BUS --> OBS3 --> WSB
+  OBS2 --> WSB
+  WSB -- "/topic/incidents · /topic/user/{id}" --> WSC --> UI

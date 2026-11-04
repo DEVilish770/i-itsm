@@ -1,0 +1,123 @@
+erDiagram
+  USERS {
+    bigint id PK
+    varchar user_type "EMPLOYEE | TECHNICIAN | ADMIN (discriminator)"
+    varchar username UK
+    varchar password_hash
+    varchar full_name
+    varchar email UK
+    varchar phone
+    boolean active
+    varchar department "employees"
+    int experience_years "technicians"
+    int max_workload "technicians"
+    boolean available "technicians"
+    boolean is_team_lead "technicians"
+    timestamp created_at
+  }
+  INCIDENT_CATEGORIES {
+    bigint id PK
+    varchar name UK
+    varchar description
+    varchar keywords
+    boolean active
+  }
+  TECHNICIAN_SKILLS {
+    bigint technician_id FK
+    bigint category_id FK
+  }
+  IT_SERVICES {
+    bigint id PK
+    varchar name UK
+    varchar criticality
+    varchar owner
+    int user_base
+    boolean active
+  }
+  SLA_POLICIES {
+    bigint id PK
+    varchar priority UK
+    int response_minutes
+    int resolution_minutes
+    int warning_threshold_pct
+  }
+  INCIDENTS {
+    bigint id PK
+    varchar incident_number UK
+    varchar title
+    varchar description
+    bigint reporter_id FK
+    bigint category_id FK
+    bigint service_id FK
+    bigint technician_id FK
+    bigint related_incident_id FK
+    bigint closed_by_id FK
+    varchar impact
+    varchar urgency
+    varchar priority
+    int priority_score
+    varchar priority_rationale
+    int affected_users
+    varchar status
+    int escalation_level
+    timestamp sla_started_at
+    timestamp sla_response_deadline
+    timestamp sla_resolution_deadline
+    timestamp sla_responded_at
+    timestamp sla_resolved_at
+    boolean sla_response_violated
+    boolean sla_resolution_violated
+    varchar sla_status
+    varchar resolution_summary
+    varchar resolution_root_cause
+    int feedback_rating
+    varchar feedback_comment
+    timestamp created_at
+    timestamp updated_at
+    timestamp closed_at
+  }
+  INVESTIGATION_NOTES {
+    bigint id PK
+    bigint incident_id FK
+    bigint author_id FK
+    varchar type
+    varchar content
+    timestamp created_at
+  }
+  AUDIT_RECORDS {
+    bigint id PK
+    bigint incident_id
+    varchar incident_number
+    varchar actor
+    varchar action
+    varchar previous_state
+    varchar new_state
+    varchar description
+    timestamp timestamp
+  }
+  NOTIFICATIONS {
+    bigint id PK
+    bigint recipient_id
+    varchar recipient_address
+    varchar channel
+    varchar subject
+    varchar body
+    bigint incident_id
+    varchar event_type
+    boolean read
+    timestamp sent_at
+  }
+  USERS ||--o{ INCIDENTS : "reports"
+  USERS ||--o{ INCIDENTS : "assigned technician"
+  USERS ||--o{ INCIDENTS : "closed by"
+  IT_SERVICES ||--o{ INCIDENTS : "affected service"
+  INCIDENT_CATEGORIES ||--o{ INCIDENTS : "classified as"
+  INCIDENTS ||--o{ INCIDENTS : "related / duplicate of"
+  INCIDENTS ||--o{ INVESTIGATION_NOTES : "has"
+  USERS ||--o{ INVESTIGATION_NOTES : "authored"
+  USERS ||--o{ TECHNICIAN_SKILLS : "technician"
+  INCIDENT_CATEGORIES ||--o{ TECHNICIAN_SKILLS : "skill"
+  INCIDENTS ||--o{ AUDIT_RECORDS : "history"
+  INCIDENTS ||--o{ NOTIFICATIONS : "about"
+  USERS ||--o{ NOTIFICATIONS : "recipient"
+  SLA_POLICIES ||..o{ INCIDENTS : "priority → targets"

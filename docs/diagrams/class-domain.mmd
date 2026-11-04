@@ -1,0 +1,88 @@
+classDiagram
+  direction LR
+  class User {
+    <<abstract>>
+    -Long id
+    -String username
+    -String passwordHash
+    -String fullName
+    -String email
+    -boolean active
+    +getRole() Role*
+    +getDisplayLabel() String
+    +changePassword(hash)
+    +deactivate()
+  }
+  class Employee { -String department }
+  class Technician {
+    -int experienceYears
+    -int maxWorkload
+    -boolean available
+    -boolean teamLead
+    +hasSkill(category) boolean
+  }
+  class Administrator
+  User <|-- Employee
+  User <|-- Technician
+  User <|-- Administrator
+  Technician "0..*" -- "0..*" IncidentCategory : skills
+
+  class Incident {
+    -String incidentNumber
+    -String title
+    -String description
+    -Impact impact
+    -Urgency urgency
+    -Priority priority
+    -int priorityScore
+    -IncidentStatus status
+    -int escalationLevel
+    +classify(category, priority, score, rationale)
+    +assign(technician)
+    +acknowledge()
+    +startInvestigation()
+    +requestInfo()
+    +provideInfo()
+    +resolve(resolution)
+    +verify()
+    +reopen()
+    +close(by, notes)
+    +addNote(author, type, text) InvestigationNote
+    +giveFeedback(rating, comment)
+    +allowedActions() Set~String~
+  }
+  class SLATracker {
+    -LocalDateTime startedAt
+    -LocalDateTime responseDeadline
+    -LocalDateTime resolutionDeadline
+    -LocalDateTime respondedAt
+    -LocalDateTime resolvedAt
+    -SLAStatus status
+    +applyPolicy(policy, from)
+    +markResponded(at)
+    +markResolved(at)
+    +evaluate(now, warnPct) boolean
+    +percentRemaining(now) double
+  }
+  class Resolution { -String summary; -String rootCause; -String resolvedBy }
+  class Feedback { -int rating; -String comment }
+  class InvestigationNote { -NoteType type; -String content; -LocalDateTime createdAt }
+  class ITService { -String name; -BusinessCriticality criticality; -String owner; -int userBase; -boolean active }
+  class IncidentCategory { -String name; -String keywords; -boolean active }
+  class SLAPolicy { -Priority priority; -int responseMinutes; -int resolutionMinutes; -int warningThresholdPct }
+  class AuditRecord { -LocalDateTime timestamp; -String actor; -String action; -String previousState; -String newState; -String description }
+  class Notification { -NotificationChannelType channel; -String subject; -String body; -boolean read; +markRead() }
+
+  Incident *-- "1" SLATracker : composition
+  Incident *-- "0..1" Resolution : composition
+  Incident *-- "0..1" Feedback : composition
+  Incident *-- "0..*" InvestigationNote : composition
+  Incident --> "1" User : reporter
+  Incident --> "0..1" Technician : assignedTechnician
+  Incident --> "1" ITService : affects
+  Incident --> "0..1" IncidentCategory : category
+  Incident --> "0..1" Incident : relatedIncident
+  InvestigationNote --> "1" User : author
+  SLAPolicy ..> SLATracker : configures
+  AuditRecord ..> Incident : records history of
+  Notification ..> User : recipient

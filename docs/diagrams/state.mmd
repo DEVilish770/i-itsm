@@ -1,0 +1,18 @@
+stateDiagram-v2
+  [*] --> NEW : employee reports
+  NEW --> CLASSIFIED : classify()  [category + priority + SLA applied]
+  CLASSIFIED --> ASSIGNED : assign(technician)  [strategy or manual]
+  ASSIGNED --> ACKNOWLEDGED : acknowledge()  [response SLA stamped]
+  ASSIGNED --> ASSIGNED : assign()  [reassign / escalation]
+  ACKNOWLEDGED --> IN_PROGRESS : startInvestigation()
+  ACKNOWLEDGED --> ASSIGNED : assign()  [reassign]
+  IN_PROGRESS --> PENDING_INFO : requestInfo()
+  PENDING_INFO --> IN_PROGRESS : provideInfo()  [reporter replies]
+  IN_PROGRESS --> RESOLVED : resolve(resolution)  [resolution SLA evaluated]
+  IN_PROGRESS --> ASSIGNED : assign()  [reassign]
+  RESOLVED --> VERIFIED : verify()  [reporter confirms]
+  RESOLVED --> IN_PROGRESS : reopen()  [reporter rejects]
+  RESOLVED --> CLOSED : close()  [admin only]
+  VERIFIED --> CLOSED : close()  [reporter or admin]
+  CLOSED --> [*]
+  note right of NEW : Any other call (e.g. close(), resolve()) throws InvalidStateTransitionException

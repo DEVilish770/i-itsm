@@ -1,0 +1,87 @@
+classDiagram
+  direction LR
+  class PriorityStrategy {
+    <<interface>>
+    +name() String
+    +description() String
+    +calculate(ctx) PriorityResult
+  }
+  class PriorityContext {
+    <<record>>
+    Impact impact
+    Urgency urgency
+    BusinessCriticality criticality
+    int affectedUsers
+    int serviceUserBase
+  }
+  class PriorityResult {
+    <<record>>
+    Priority priority
+    int score
+    String rationale
+  }
+  class WeightedScoringPriorityStrategy {
+    impact x urgency x criticality + user bonus
+  }
+  class RuleBasedPriorityStrategy {
+    ordered rule table R1..R6
+  }
+  PriorityStrategy <|.. WeightedScoringPriorityStrategy
+  PriorityStrategy <|.. RuleBasedPriorityStrategy
+  PriorityStrategy ..> PriorityContext : input
+  PriorityStrategy ..> PriorityResult : output
+
+  class AssignmentStrategy {
+    <<interface>>
+    +name() String
+    +description() String
+    +select(incident, candidates) Optional~TechnicianCandidate~
+  }
+  class TechnicianCandidate {
+    <<record>>
+    Technician technician
+    int activeWorkload
+    int priorIncidentsOnService
+    +hasCapacity() boolean
+  }
+  class SkillBasedAssignmentStrategy
+  class LoadBalancedAssignmentStrategy
+  class RoundRobinAssignmentStrategy {
+    -AtomicInteger cursor
+  }
+  class SmartRecommendationStrategy {
+    +score(incident, candidate) double
+  }
+  AssignmentStrategy <|.. SkillBasedAssignmentStrategy
+  AssignmentStrategy <|.. LoadBalancedAssignmentStrategy
+  AssignmentStrategy <|.. RoundRobinAssignmentStrategy
+  AssignmentStrategy <|.. SmartRecommendationStrategy
+  AssignmentStrategy ..> TechnicianCandidate
+
+  class StrategyRegistry {
+    -Map~String,AssignmentStrategy~ assignment
+    -Map~String,PriorityStrategy~ priority
+    -String activeAssignment
+    -String activePriority
+    +assignmentStrategy() AssignmentStrategy
+    +priorityStrategy() PriorityStrategy
+    +activateAssignment(name)
+    +activatePriority(name)
+  }
+  StrategyRegistry o-- "1..*" AssignmentStrategy
+  StrategyRegistry o-- "1..*" PriorityStrategy
+  class AssignmentService {
+    +choose(incident, strategyName) Technician
+    +recommend(incident) List
+  }
+  class IncidentService {
+    +report(req)
+    +autoAssign(id, strategy)
+  }
+  IncidentService ..> StrategyRegistry : priorityStrategy()
+  IncidentService ..> AssignmentService
+  AssignmentService ..> StrategyRegistry : assignmentStrategy()
+  class AdminService {
+    +configureStrategies(req)
+  }
+  AdminService ..> StrategyRegistry : switches at runtime

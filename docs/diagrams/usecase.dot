@@ -1,0 +1,19 @@
+digraph UseCase {
+  rankdir=LR; fontname="Helvetica"; node [fontname="Helvetica", fontsize=11]; edge [color="#555555", arrowhead=none];
+  subgraph cluster_sys { label="I-ITSM System"; style="rounded"; color="#1f4e9e"; fontsize=14; fontcolor="#1f4e9e";
+    node [shape=ellipse, style=filled, fillcolor="#eef3fb", color="#1f4e9e"];
+    uc1 [label="Register / Login"]; uc2 [label="Report incident"]; uc3 [label="View & track\nown incidents"]; uc4 [label="Add information /\nrespond to request"];
+    uc5 [label="Verify resolution\n& give feedback"]; uc6 [label="View assigned queue\n& workload"]; uc7 [label="Acknowledge incident"]; uc8 [label="Investigate &\nadd notes"];
+    uc9 [label="Request information"]; uc10 [label="Resolve incident"]; uc11 [label="Manage users &\ntechnicians"]; uc12 [label="Manage IT services\n& categories"];
+    uc13 [label="Configure SLA policies\n& strategies"]; uc14 [label="Assign / reassign\ntechnician"]; uc15 [label="Monitor incidents\n(live dashboard)"]; uc16 [label="View reports &\naudit logs"];
+    uc17 [label="Close incident"]; uc18 [label="Search & filter\nincidents"];
+    node [fillcolor="#fff7e6", color="#b45309"];
+    s1 [label="Classify & prioritise\n(auto)"]; s2 [label="Detect duplicates"]; s3 [label="Apply SLA &\nmonitor deadlines"]; s4 [label="Escalate\nunacknowledged P1/P2"]; s5 [label="Notify users\n(email / SMS / in-app)"]; s6 [label="Record audit trail"];
+  }
+  node [shape=plaintext, fontsize=12, image="", style=""];
+  emp [label="Employee /\nCustomer", shape=box, style="rounded,filled", fillcolor="#e8f5e9"]; tech [label="Technician", shape=box, style="rounded,filled", fillcolor="#e3f2fd"]; adm [label="Administrator /\nIT Manager", shape=box, style="rounded,filled", fillcolor="#fce4ec"]; clk [label="SLA Monitor\n(scheduler)", shape=box, style="rounded,dashed"];
+  emp -> {uc1 uc2 uc3 uc4 uc5 uc17}; tech -> {uc1 uc6 uc7 uc8 uc9 uc10 uc18}; adm -> {uc1 uc11 uc12 uc13 uc14 uc15 uc16 uc17 uc18};
+  edge [style=dashed, arrowhead=vee, label="«include»", fontsize=9, fontcolor="#777"];
+  uc2 -> s1; uc2 -> s2; uc2 -> s3; uc14 -> s5; uc10 -> s5; uc7 -> s6; uc10 -> s6; uc17 -> s6;
+  clk -> s3 [style=solid, arrowhead=none, label=""]; clk -> s4 [style=solid, arrowhead=none, label=""]; s4 -> s5;
+}
