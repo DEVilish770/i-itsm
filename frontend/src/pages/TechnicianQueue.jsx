@@ -1,42 +1,40 @@
-import { useNavigate } from 'react-router-dom'
-import { api, fmt } from '../lib/api.js'
-import { Badge, Stat, useLoad } from '../components/ui.jsx'
+import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
+import { firstName, greeting, plural } from '../lib/words.js'
+import { EmptyState, Hero, IncidentRow, Page, Section, Stat, useLoad, useNow } from '../components/ui.jsx'
 
 export default function TechnicianQueue() {
   const { user } = useAuth()
-  const nav = useNavigate()
+  const now = useNow(30000)
   const { data } = useLoad(() => api('/api/incidents/queue'))
   const { data: techs } = useLoad(() => api('/api/technicians'))
   const me = (techs || []).find((t) => t.id === user.id)
   const list = data || []
   const need = list.filter((i) => i.status === 'ASSIGNED').length
   const risk = list.filter((i) => i.slaStatus === 'AT_RISK' || i.slaStatus === 'VIOLATED').length
+  const full = me && me.activeWorkload >= me.maxWorkload
+
+  const line = !data ? 'Checking your queue…'
+    : list.length === 0 ? 'All quiet. Nothing needs you right now.'
+      : `${plural(list.length, 'incident')} on your plate.${need ? ` ${need} waiting for you to acknowledge.` : ''}${risk ? ` ${risk} running out of time.` : ''}`
+
   return (
-    <div className="stack">
-      <h1>My queue</h1>
-      <div className="grid cols-4">
-        <Stat label="Active incidents" value={me?.activeWorkload ?? list.length} />
-        <Stat label="Capacity" value={me ? `${me.activeWorkload} / ${me.maxWorkload}` : '—'} tone={me && me.activeWorkload >= me.maxWorkload ? 'bad' : ''} />
-        <Stat label="Awaiting acknowledgement" value={need} tone={need ? 'warn' : ''} />
-        <Stat label="SLA at risk / breached" value={risk} tone={risk ? 'bad' : 'ok'} />
+    <Page hero={<Hero title={`${greeting()}, ${firstName(user)}.`}><span>{line}</span></Hero>}>
+      <div className="figures four">
+        <Stat label="Active" value={me?.activeWorkload ?? list.length} title="Active incidents" />
+        <Stat label="Capacity" value={me ? `${me.activeWorkload} / ${me.maxWorkload}` : '—'} tone={full ? 'urgent' : ''} title="Active workload / maximum workload" />
+        <Stat label="Waiting for you" value={need} tone={need ? 'high' : ''} title="Awaiting acknowledgement (ASSIGNED)" />
+        <Stat label="At risk or overdue" value={risk} tone={risk ? 'urgent' : ''} title="SLA at risk / breached" />
       </div>
-      {me && <div className="card small muted">Skills: {(me.skills || []).join(', ') || 'none'} · {me.experienceYears} yrs experience {me.teamLead && '· Team lead'}</div>}
-      <div className="card">
-        <table>
-          <thead><tr><th>Number</th><th>Title</th><th>Service</th><th>Priority</th><th>Status</th><th>SLA</th><th>Deadline</th><th>Age</th></tr></thead>
-          <tbody>
-            {list.map((i) => (
-              <tr key={i.id} className="clickable" onClick={() => nav(`/incidents/${i.id}`)}>
-                <td className="mono">{i.incidentNumber}</td><td>{i.title}</td><td>{i.service?.name}</td>
-                <td><Badge v={i.priority} /></td><td><Badge v={i.status} /></td><td><Badge v={i.slaStatus} /></td>
-                <td className="small">{fmt.dt(i.resolutionDeadline)}</td><td className="small muted">{fmt.ago(i.createdAt)}</td>
-              </tr>
-            ))}
-            {list.length === 0 && <tr><td colSpan={8} className="muted">Nothing assigned to you right now.</td></tr>}
-          </tbody>
-        </table>
-      </div>
-    </div>
+      {me && (
+        <p className="quiet me-line">
+          Skills: {(me.skills || []).join(', ') || 'none yet'} · {me.experienceYears} {me.experienceYears === 1 ? 'year' : 'years'} of experience{me.teamLead ? ' · Team lead' : ''}
+        </p>
+      )}
+      <Section title="Your queue" note="Most urgent first">
+        {data && list.length === 0 && <EmptyState>Nothing needs you right now. New assignments appear here and in the bell.</EmptyState>}
+        <div className="rows">{list.map((i, idx) => <IncidentRow key={i.id} i={i} index={idx} now={now} />)}</div>
+      </Section>
+    </Page>
   )
 }

@@ -39,6 +39,8 @@ public class SecurityConfig {
                 .requestMatchers("/api/auth/**", "/ws/**", "/h2-console/**", "/actuator/health", "/error").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .requestMatchers("/api/technician/**").hasAnyRole("TECHNICIAN", "ADMIN")
+                // AI drafting helpers are for people who report incidents; /api/ai/status and /api/ai/search: any logged-in user
+                .requestMatchers("/api/ai/screenshot-triage", "/api/ai/chat").hasAnyRole("EMPLOYEE", "ADMIN")
                 .anyRequest().authenticated())
             .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class);
         return http.build();

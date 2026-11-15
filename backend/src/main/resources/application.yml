@@ -31,6 +31,18 @@ itsm:
     window-hours: 48
   seed:
     enabled: ${SEED_ENABLED:true}
+  # Claude features. The API key is read only from the ANTHROPIC_API_KEY environment variable (never from this file);
+  # without it every feature runs on its rules fallback. An admin can switch AI on/off at runtime (PUT /api/admin/ai).
+  ai:
+    enabled: ${ITSM_AI_ENABLED:true}
+    model: claude-sonnet-5-5
+    daily-limit: ${ITSM_AI_DAILY_LIMIT:150}   # calls per day; the count restarts at midnight Asia/Kolkata
+    timeouts:
+      triage: 8s
+      chat: 8s
+      search: 8s
+      status: 6s
+      summary: 8s
 
 logging:
   level:

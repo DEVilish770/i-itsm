@@ -22,7 +22,7 @@ services:
       DB_USER: itsm
       DB_PASSWORD: itsm
       # No committed fallback. Unset = random signing key per start (everyone signs in again after a restart);
-      # to keep logins across restarts, set JWT_SECRET (32+ bytes) in your shell or in a .env file next to this one.
+      # to keep logins across restarts, set JWT_SECRET (32+ bytes) in your shell or in the private env file below.
       JWT_SECRET: ${JWT_SECRET:-}
       # Demo speed: SLA sweep every 10 s, unacknowledged P1/P2 escalate after 2 min (app defaults: 30 s / 10 min)
       SLA_MONITOR_SECONDS: 10
@@ -30,6 +30,14 @@ services:
       # Timestamps are stored and sent without a zone, so the backend clock must match the users' (IST)
       TZ: Asia/Kolkata
       JAVA_TOOL_OPTIONS: "-Duser.timezone=Asia/Kolkata"
+      # Claude features: keep the key OUTSIDE this project and outside any synced folder (Google Drive, iCloud,
+      # OneDrive, Dropbox), e.g. in ~/.config/i-itsm/ai.env, and start with:
+      #   docker compose --env-file ~/.config/i-itsm/ai.env up --build -d
+      # A key already exported in your shell wins over the env file and switches the AI on (billed to that key).
+      # Unset or blank = every AI feature uses its rules fallback. ITSM_AI_ENABLED=false starts with AI switched off.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ITSM_AI_ENABLED: ${ITSM_AI_ENABLED:-true}
+      ITSM_AI_DAILY_LIMIT: ${ITSM_AI_DAILY_LIMIT:-150}
     ports: ["8080:8080"]
     depends_on:
       db:

@@ -9,6 +9,13 @@ frontend/dist/
 .idea/
 .vscode/
 *.iml
+.classpath
+.project
+.settings/
+.factorypath
 .DS_Store
-# env
+Thumbs.db
+# env: keys never go in the repo (keep the Claude key in ~/.config/i-itsm/ai.env)
 .env
+.env.*
+*.env

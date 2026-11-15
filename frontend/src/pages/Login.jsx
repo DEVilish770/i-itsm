@@ -1,7 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/auth.jsx'
-import { Alert } from '../components/ui.jsx'
+import { errText } from '../lib/api.js'
+import { Alert, Tabs, ThemeToggle } from '../components/ui.jsx'
+import DotField from '../components/DotField.jsx'
+import { Mark } from '../components/icons.jsx'
+
+const DEMO = ['admin', 'tech.arjun', 'tech.priya', 'emp.raj']
 
 export default function Login() {
   const { login, register } = useAuth()
@@ -10,7 +15,9 @@ export default function Login() {
   const [f, setF] = useState({ username: '', password: '', fullName: '', email: '', phone: '', department: '' })
   const [err, setErr] = useState(null)
   const [busy, setBusy] = useState(false)
+  const password = useRef(null)
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
+  useEffect(() => { document.title = mode === 'login' ? 'Sign in · I-ITSM' : 'Register · I-ITSM' }, [mode])
 
   async function submit(e) {
     e.preventDefault(); setErr(null); setBusy(true)
@@ -18,33 +25,48 @@ export default function Login() {
       if (mode === 'login') await login(f.username, f.password); else await register(f)
       nav('/')
     } catch (ex) {
-      setErr(ex.body?.fields ? Object.entries(ex.body.fields).map(([k, v]) => `${k}: ${v}`).join('; ') : ex.message)
+      setErr(errText(ex))
     } finally { setBusy(false) }
+  }
+
+  function pickDemo(name) {
+    setF({ ...f, username: name })
+    password.current?.focus()
   }
 
   return (
     <div className="login">
-      <form className="card" onSubmit={submit}>
-        <h1>I-ITSM</h1>
-        <p className="muted">Intelligent IT Service Management &amp; Incident Resolution</p>
-        <div className="pill-group" style={{ marginBottom: '1rem' }}>
-          <button type="button" className={mode === 'login' ? 'on' : ''} onClick={() => setMode('login')}>Sign in</button>
-          <button type="button" className={mode === 'register' ? 'on' : ''} onClick={() => setMode('register')}>Register as employee</button>
-        </div>
-        <Alert kind="error">{err}</Alert>
-        <div className="field"><label>Username</label><input value={f.username} onChange={set('username')} autoFocus required /></div>
-        <div className="field"><label>Password</label><input type="password" value={f.password} onChange={set('password')} required /></div>
-        {mode === 'register' && <>
-          <div className="field"><label>Full name</label><input value={f.fullName} onChange={set('fullName')} required /></div>
-          <div className="field"><label>Email</label><input type="email" value={f.email} onChange={set('email')} required /></div>
-          <div className="grid cols-2">
-            <div className="field"><label>Phone (for SMS)</label><input value={f.phone} onChange={set('phone')} /></div>
-            <div className="field"><label>Department</label><input value={f.department} onChange={set('department')} /></div>
-          </div>
-        </>}
-        <div className="actions"><button className="primary" disabled={busy}>{mode === 'login' ? 'Sign in' : 'Create account'}</button></div>
-        {mode === 'login' && <p className="small muted" style={{ marginTop: '1rem' }}>Demo accounts (password <span className="kbd">password123</span>): <span className="mono">admin</span>, <span className="mono">tech.arjun</span>, <span className="mono">tech.priya</span>, <span className="mono">emp.raj</span></p>}
-      </form>
+      <div className="login-art" aria-hidden="true">
+        <DotField variant="panel" />
+        <div className="login-mark"><Mark size={20} /><span>I-ITSM</span></div>
+      </div>
+      <div className="login-side">
+        <div className="login-top"><ThemeToggle /></div>
+        <form className="login-form" onSubmit={submit} key={mode}>
+          <h1 className="login-title">{mode === 'login' ? 'Welcome back.' : 'Join your team.'}</h1>
+          <p className="login-sub">IT help that keeps track, keeps time and keeps you posted.</p>
+          <Tabs value={mode} onChange={(m) => { setMode(m); setErr(null) }} label="Sign in or register"
+            options={[['login', 'Sign in'], ['register', 'Register as employee']]} />
+          <Alert kind="error">{err}</Alert>
+          <div className="field"><label htmlFor="u">Username</label><input id="u" value={f.username} onChange={set('username')} autoComplete="username" autoFocus required /></div>
+          <div className="field"><label htmlFor="p">Password</label><input id="p" ref={password} type="password" value={f.password} onChange={set('password')} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} required /></div>
+          {mode === 'register' && <>
+            <div className="field"><label htmlFor="n">Full name</label><input id="n" value={f.fullName} onChange={set('fullName')} autoComplete="name" required /></div>
+            <div className="field"><label htmlFor="e">Email</label><input id="e" type="email" value={f.email} onChange={set('email')} autoComplete="email" required /></div>
+            <div className="grid-2">
+              <div className="field"><label htmlFor="ph">Phone, for text alerts</label><input id="ph" value={f.phone} onChange={set('phone')} autoComplete="tel" /></div>
+              <div className="field"><label htmlFor="d">Department</label><input id="d" value={f.department} onChange={set('department')} /></div>
+            </div>
+          </>}
+          <div className="form-actions"><button className="btn wide" disabled={busy}>{busy ? 'One moment…' : mode === 'login' ? 'Sign in' : 'Create account'}</button></div>
+          {mode === 'login' && (
+            <p className="demo-line">
+              Demo accounts, password <code>password123</code>:{' '}
+              {DEMO.map((d, i) => <span key={d}><button type="button" className="link" onClick={() => pickDemo(d)}>{d}</button>{i < DEMO.length - 1 ? ', ' : ''}</span>)}
+            </p>
+          )}
+        </form>
+      </div>
     </div>
   )
 }

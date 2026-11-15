@@ -69,14 +69,16 @@ public class CatalogController {
         return Map.of("unread", notifications.countByRecipientIdAndChannelAndReadFalse(currentUser.get().getId(), NotificationChannelType.IN_APP));
     }
 
+    /** Only the read flag is written (and only on the caller's own row), so Claude's rewrite landing meanwhile is kept. */
     @PostMapping("/notifications/{id}/read")
     public void markRead(@PathVariable Long id) {
-        Notification n = notifications.findById(id).orElse(null);
-        if (n != null && n.getRecipientId().equals(currentUser.get().getId())) { n.markRead(); notifications.save(n); }
+        notifications.markRead(currentUser.get().getId(), List.of(id));
     }
 
     @PostMapping("/notifications/read-all")
     public void markAllRead() {
-        notifications.findTop50ByRecipientIdOrderBySentAtDesc(currentUser.get().getId()).forEach(n -> { n.markRead(); notifications.save(n); });
+        Long me = currentUser.get().getId();
+        List<Long> latest = notifications.findTop50ByRecipientIdOrderBySentAtDesc(me).stream().map(Notification::getId).toList();
+        if (!latest.isEmpty()) notifications.markRead(me, latest);
     }
 }

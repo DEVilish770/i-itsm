@@ -106,6 +106,8 @@ erDiagram
     varchar event_type
     boolean read
     timestamp sent_at
+    varchar plain_text "plain-language line for the reporter, in-app rows only"
+    varchar text_source "AI | RULES"
   }
   USERS ||--o{ INCIDENTS : "reports"
   USERS ||--o{ INCIDENTS : "assigned technician"

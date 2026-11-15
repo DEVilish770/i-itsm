@@ -2,11 +2,15 @@ package edu.bits.itsm.domain.notification;
 
 import jakarta.persistence.*;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 /** A message delivered (or simulated as delivered) to a user over one channel. */
 @Entity
 @Table(name = "notifications", indexes = @Index(name = "idx_notif_recipient", columnList = "recipient_id"))
 public class Notification {
+
+    /** Longest plain-language line stored; longer text is cut with an ellipsis. */
+    public static final int PLAIN_TEXT_MAX = 600;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -40,6 +44,15 @@ public class Notification {
     @Column(name = "sent_at", nullable = false, updatable = false)
     private LocalDateTime sentAt = LocalDateTime.now();
 
+    /** Optional reporter-facing version of the message in everyday words; null when the event has none. */
+    @Column(name = "plain_text", length = PLAIN_TEXT_MAX)
+    private String plainText;
+
+    /** Who wrote {@link #plainText}: a template (RULES) at first, possibly replaced by Claude's words (AI) shortly after. */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "text_source", length = 10)
+    private TextSource textSource;
+
     protected Notification() { }
 
     public Notification(Long recipientId, String recipientAddress, NotificationChannelType channel,
@@ -55,6 +68,19 @@ public class Notification {
 
     public void markRead() { this.read = true; }
 
+    /** Sets the plain-language line and who wrote it; blank text clears both, long text is cut to fit the column. */
+    public void describePlainly(String text, TextSource source) {
+        this.plainText = fitPlainText(text);
+        this.textSource = plainText == null ? null : Objects.requireNonNull(source, "source");
+    }
+
+    /** The plain-language line as stored: trimmed and cut to {@link #PLAIN_TEXT_MAX} with an ellipsis; null when blank. */
+    public static String fitPlainText(String text) {
+        if (text == null || text.isBlank()) return null;
+        String t = text.strip();
+        return t.length() > PLAIN_TEXT_MAX ? t.substring(0, PLAIN_TEXT_MAX - 3) + "..." : t;
+    }
+
     public Long getId() { return id; }
     public Long getRecipientId() { return recipientId; }
     public String getRecipientAddress() { return recipientAddress; }
@@ -65,4 +91,6 @@ public class Notification {
     public String getEventType() { return eventType; }
     public boolean isRead() { return read; }
     public LocalDateTime getSentAt() { return sentAt; }
+    public String getPlainText() { return plainText; }
+    public TextSource getTextSource() { return textSource; }
 }

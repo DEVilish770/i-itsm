@@ -1,6 +1,9 @@
 import { useState } from 'react'
-import { api } from '../lib/api.js'
-import { Alert, Modal, useLoad } from '../components/ui.jsx'
+import { api, errText } from '../lib/api.js'
+import { ROLE_WORD } from '../lib/words.js'
+import { Alert, Choice, Modal, Page, Section, useLoad } from '../components/ui.jsx'
+
+const ROLES = ['EMPLOYEE', 'TECHNICIAN', 'ADMIN']
 
 export default function AdminUsers() {
   const { data: users, reload } = useLoad(() => api('/api/admin/users'))
@@ -15,63 +18,104 @@ export default function AdminUsers() {
     try {
       await api('/api/admin/users', { method: 'POST', body: { ...f, experienceYears: Number(f.experienceYears), maxWorkload: Number(f.maxWorkload) } })
       setModal(null); reload()
-    } catch (ex) { setErr(ex.body?.fields ? Object.entries(ex.body.fields).map(([k, v]) => `${k}: ${v}`).join('; ') : ex.message) }
+    } catch (ex) { setErr(errText(ex)) }
   }
-  async function toggle(u) { await api(`/api/admin/users/${u.id}/active?active=${!u.active}`, { method: 'PATCH' }); reload() }
+  async function toggle(u) {
+    try { setErr(null); await api(`/api/admin/users/${u.id}/active?active=${!u.active}`, { method: 'PATCH' }); reload() } catch (ex) { setErr(errText(ex)) }
+  }
   async function updateTech(t, patch) { try { await api(`/api/admin/technicians/${t.id}`, { method: 'PUT', body: patch }); reload() } catch (ex) { setErr(ex.message) } }
 
   const techs = (users || []).filter((u) => u.role === 'TECHNICIAN')
   const others = (users || []).filter((u) => u.role !== 'TECHNICIAN')
   return (
-    <div className="stack">
-      <div className="row spread"><h1>Users &amp; technicians</h1><button className="primary" onClick={() => setModal(true)}>+ Create user</button></div>
+    <Page intro="Who can sign in, and what each technician can take on." actions={<button type="button" className="btn" onClick={() => { setErr(null); setModal(true) }}>Add a person</button>}>
       <Alert kind="error" onClose={() => setErr(null)}>{err}</Alert>
-      <div className="card"><h3>Technicians</h3>
-        <table><thead><tr><th>Name</th><th>Skills</th><th>Exp (yrs)</th><th>Workload</th><th>Available</th><th>Team lead</th><th>Active</th></tr></thead><tbody>
-          {techs.map((t) => <tr key={t.id}>
-            <td>{t.fullName}<div className="small muted mono">{t.username}</div></td>
-            <td><div className="pill-group">{(categories || []).map((c) => <button key={c.id} className={`sm ${t.skills?.includes(c.name) ? 'on' : ''}`} onClick={() => {
-              const ids = (categories || []).filter((x) => t.skills?.includes(x.name)).map((x) => x.id)
-              const next = ids.includes(c.id) ? ids.filter((x) => x !== c.id) : [...ids, c.id]
-              updateTech(t, { skillCategoryIds: next })
-            }}>{c.name}</button>)}</div></td>
-            <td><input type="number" min="0" style={{ width: 70 }} defaultValue={t.experienceYears} onBlur={(e) => Number(e.target.value) !== t.experienceYears && updateTech(t, { experienceYears: Number(e.target.value) })} /></td>
-            <td>{t.activeWorkload} / <input type="number" min="1" max="50" style={{ width: 60 }} defaultValue={t.maxWorkload} onBlur={(e) => Number(e.target.value) !== t.maxWorkload && updateTech(t, { maxWorkload: Number(e.target.value) })} /></td>
-            <td><input type="checkbox" style={{ width: 'auto' }} checked={t.available} onChange={() => updateTech(t, { available: !t.available })} /></td>
-            <td><input type="checkbox" style={{ width: 'auto' }} checked={t.teamLead} onChange={() => updateTech(t, { teamLead: !t.teamLead })} /></td>
-            <td><button className={`sm ${t.active ? 'danger' : ''}`} onClick={() => toggle(t)}>{t.active ? 'Deactivate' : 'Activate'}</button></td>
-          </tr>)}
-        </tbody></table></div>
-      <div className="card"><h3>Employees &amp; administrators</h3>
-        <table><thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Department</th><th>Active</th></tr></thead><tbody>
-          {others.map((u) => <tr key={u.id}><td>{u.fullName}<div className="small muted mono">{u.username}</div></td><td><span className="badge role">{u.role}</span></td><td>{u.email}</td><td>{u.phone || '—'}</td><td>{u.department || '—'}</td>
-            <td><button className={`sm ${u.active ? 'danger' : ''}`} onClick={() => toggle(u)}>{u.active ? 'Deactivate' : 'Activate'}</button></td></tr>)}
-        </tbody></table></div>
 
-      {modal && <Modal title="Create user" onClose={() => setModal(null)}>
-        <form onSubmit={create}>
-          <Alert kind="error">{err}</Alert>
-          <div className="grid cols-2">
-            <div className="field"><label>Role</label><select value={f.role} onChange={set('role')}>{['EMPLOYEE', 'TECHNICIAN', 'ADMIN'].map((r) => <option key={r}>{r}</option>)}</select></div>
-            <div className="field"><label>Username</label><input value={f.username} onChange={set('username')} required /></div>
-            <div className="field"><label>Password (min 8)</label><input type="password" value={f.password} onChange={set('password')} required /></div>
-            <div className="field"><label>Full name</label><input value={f.fullName} onChange={set('fullName')} required /></div>
-            <div className="field"><label>Email</label><input type="email" value={f.email} onChange={set('email')} required /></div>
-            <div className="field"><label>Phone</label><input value={f.phone} onChange={set('phone')} /></div>
-          </div>
-          {f.role === 'EMPLOYEE' && <div className="field"><label>Department</label><input value={f.department} onChange={set('department')} /></div>}
-          {f.role === 'TECHNICIAN' && <>
-            <div className="grid cols-3">
-              <div className="field"><label>Experience (yrs)</label><input type="number" min="0" value={f.experienceYears} onChange={set('experienceYears')} /></div>
-              <div className="field"><label>Max workload</label><input type="number" min="1" value={f.maxWorkload} onChange={set('maxWorkload')} /></div>
-              <div className="field"><label>Team lead</label><input type="checkbox" style={{ width: 'auto' }} checked={f.teamLead} onChange={set('teamLead')} /></div>
+      <Section title="Technicians" note="Skills decide who gets which work">
+        <div className="table-scroll">
+          <table className="table">
+            <thead><tr><th>Name</th><th>Skills</th><th>Experience</th><th title="Active workload / maximum workload">Workload</th><th>Available</th><th>Team lead</th><th /></tr></thead>
+            <tbody>
+              {techs.map((t) => (
+                <tr key={t.id} className={t.active ? '' : 'inactive'}>
+                  <td>{t.fullName}<div className="quiet mono">{t.username}</div></td>
+                  <td>
+                    <div className="skills">
+                      {(categories || []).map((c) => {
+                        const on = !!t.skills?.includes(c.name)
+                        return (
+                          <button key={c.id} type="button" className={`skill${on ? ' on' : ''}`} aria-pressed={on} title={on ? `Remove ${c.name}` : `Add ${c.name}`} onClick={() => {
+                            const ids = (categories || []).filter((x) => t.skills?.includes(x.name)).map((x) => x.id)
+                            const next = ids.includes(c.id) ? ids.filter((x) => x !== c.id) : [...ids, c.id]
+                            updateTech(t, { skillCategoryIds: next })
+                          }}>{c.name}</button>
+                        )
+                      })}
+                    </div>
+                  </td>
+                  <td><input className="inline-num" type="number" min="0" defaultValue={t.experienceYears} aria-label={`${t.fullName} years of experience`}
+                    onBlur={(e) => Number(e.target.value) !== t.experienceYears && updateTech(t, { experienceYears: Number(e.target.value) })} /> <span className="quiet">yrs</span></td>
+                  <td className="nowrap">{t.activeWorkload} / <input className="inline-num" type="number" min="1" max="50" defaultValue={t.maxWorkload} aria-label={`${t.fullName} maximum workload`}
+                    onBlur={(e) => Number(e.target.value) !== t.maxWorkload && updateTech(t, { maxWorkload: Number(e.target.value) })} /></td>
+                  <td><input type="checkbox" checked={t.available} onChange={() => updateTech(t, { available: !t.available })} aria-label={`${t.fullName} available`} /></td>
+                  <td><input type="checkbox" checked={t.teamLead} onChange={() => updateTech(t, { teamLead: !t.teamLead })} aria-label={`${t.fullName} team lead`} /></td>
+                  <td className="right"><button type="button" className={`link${t.active ? ' danger' : ' accent'}`} onClick={() => toggle(t)}>{t.active ? 'Deactivate' : 'Activate'}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      <Section title="Employees and administrators">
+        <div className="table-scroll">
+          <table className="table">
+            <thead><tr><th>Name</th><th>Role</th><th>Email</th><th>Phone</th><th>Department</th><th /></tr></thead>
+            <tbody>
+              {others.map((u) => (
+                <tr key={u.id} className={u.active ? '' : 'inactive'}>
+                  <td>{u.fullName}<div className="quiet mono">{u.username}</div></td>
+                  <td title={u.role}>{ROLE_WORD[u.role] || u.role}</td>
+                  <td>{u.email}</td><td>{u.phone || '—'}</td><td>{u.department || '—'}</td>
+                  <td className="right"><button type="button" className={`link${u.active ? ' danger' : ' accent'}`} onClick={() => toggle(u)}>{u.active ? 'Deactivate' : 'Activate'}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Section>
+
+      {modal && (
+        <Modal title="Add a person" onClose={() => setModal(null)}>
+          <form onSubmit={create}>
+            <Alert kind="error">{err}</Alert>
+            <div className="field"><span className="label-like">Role</span>
+              <Choice label="Role" value={f.role} options={ROLES.map((r) => [r, ROLE_WORD[r]])} onChange={(v) => setF({ ...f, role: v })} /></div>
+            <div className="grid-2">
+              <div className="field"><label htmlFor="nu">Username</label><input id="nu" value={f.username} onChange={set('username')} autoComplete="off" required /></div>
+              <div className="field"><label htmlFor="np">Password, at least 8 characters</label><input id="np" type="password" value={f.password} onChange={set('password')} autoComplete="new-password" required /></div>
+              <div className="field"><label htmlFor="nn">Full name</label><input id="nn" value={f.fullName} onChange={set('fullName')} required /></div>
+              <div className="field"><label htmlFor="ne">Email</label><input id="ne" type="email" value={f.email} onChange={set('email')} required /></div>
+              <div className="field"><label htmlFor="nph">Phone</label><input id="nph" value={f.phone} onChange={set('phone')} /></div>
+              {f.role === 'EMPLOYEE' && <div className="field"><label htmlFor="nd">Department</label><input id="nd" value={f.department} onChange={set('department')} /></div>}
             </div>
-            <div className="field"><label>Skills</label><div className="pill-group">{(categories || []).map((c) => <button type="button" key={c.id} className={`sm ${f.skillCategoryIds.includes(c.id) ? 'on' : ''}`}
-              onClick={() => setF({ ...f, skillCategoryIds: f.skillCategoryIds.includes(c.id) ? f.skillCategoryIds.filter((x) => x !== c.id) : [...f.skillCategoryIds, c.id] })}>{c.name}</button>)}</div></div>
-          </>}
-          <div className="actions"><button className="primary">Create</button></div>
-        </form>
-      </Modal>}
-    </div>
+            {f.role === 'TECHNICIAN' && <>
+              <div className="grid-3">
+                <div className="field"><label htmlFor="nx">Experience, years</label><input id="nx" type="number" min="0" value={f.experienceYears} onChange={set('experienceYears')} /></div>
+                <div className="field"><label htmlFor="nm">Most incidents at once</label><input id="nm" type="number" min="1" value={f.maxWorkload} onChange={set('maxWorkload')} /></div>
+                <div className="field check"><label htmlFor="nt"><input id="nt" type="checkbox" checked={f.teamLead} onChange={set('teamLead')} /> Team lead</label></div>
+              </div>
+              <div className="field"><span className="label-like">Skills</span>
+                <div className="skills">{(categories || []).map((c) => {
+                  const on = f.skillCategoryIds.includes(c.id)
+                  return <button type="button" key={c.id} className={`skill${on ? ' on' : ''}`} aria-pressed={on}
+                    onClick={() => setF({ ...f, skillCategoryIds: on ? f.skillCategoryIds.filter((x) => x !== c.id) : [...f.skillCategoryIds, c.id] })}>{c.name}</button>
+                })}</div></div>
+            </>}
+            <div className="form-actions"><button type="button" className="link" onClick={() => setModal(null)}>Cancel</button><button className="btn">Create</button></div>
+          </form>
+        </Modal>
+      )}
+    </Page>
   )
 }

@@ -12,3 +12,7 @@ itsm:
     enabled: true
   sla:
     monitor-seconds: 3600
+  # Tests never call Claude: rules mode here even if ANTHROPIC_API_KEY happens to be set on the machine.
+  # AI tests switch it on explicitly and replace the gateway with a fake (see ai/FakeAiGateway).
+  ai:
+    enabled: false

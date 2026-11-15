@@ -105,9 +105,12 @@ public final class Views {
         }
     }
 
-    public record NotificationView(Long id, String channel, String subject, String body, Long incidentId, String eventType, boolean read, LocalDateTime sentAt, String recipient) {
+    /** {@code plainText} / {@code textSource} (AI or RULES) are set only on the reporter's plain-language updates, else null. */
+    public record NotificationView(Long id, String channel, String subject, String body, Long incidentId, String eventType, boolean read, LocalDateTime sentAt, String recipient,
+                                   String plainText, String textSource) {
         public static NotificationView of(Notification n) {
-            return new NotificationView(n.getId(), n.getChannel().name(), n.getSubject(), n.getBody(), n.getIncidentId(), n.getEventType(), n.isRead(), n.getSentAt(), n.getRecipientAddress());
+            return new NotificationView(n.getId(), n.getChannel().name(), n.getSubject(), n.getBody(), n.getIncidentId(), n.getEventType(), n.isRead(), n.getSentAt(), n.getRecipientAddress(),
+                    n.getPlainText(), n.getTextSource() == null ? null : n.getTextSource().name());
         }
     }
 

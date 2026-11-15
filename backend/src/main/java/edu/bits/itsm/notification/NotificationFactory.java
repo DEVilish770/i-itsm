@@ -11,7 +11,11 @@ public final class NotificationFactory {
 
     private NotificationFactory() { }
 
-    public record Message(String subject, String body) { }
+    /** Subject and body for every channel, plus an optional plain-language line for the reporter (null = none). */
+    public record Message(String subject, String body, String plainText) {
+        public Message(String subject, String body) { this(subject, body, null); }
+        public Message withPlainText(String text) { return new Message(subject, body, text); }
+    }
 
     public static Message forEvent(IncidentEvent e) {
         Incident i = e.incident();
