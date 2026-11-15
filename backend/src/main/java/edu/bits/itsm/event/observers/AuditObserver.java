@@ -7,7 +7,10 @@ import edu.bits.itsm.repository.AuditRecordRepository;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
-/** Writes one audit record per event. Ordered first so history is never lost even if notification fails. */
+/**
+ * Writes one audit record per event, first in the observer order. It runs inside the request's transaction, so the
+ * record commits together with the change; if a later observer's database write fails, both roll back.
+ */
 @Component
 @Order(1)
 public class AuditObserver implements IncidentObserver {

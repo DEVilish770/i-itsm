@@ -1,5 +1,6 @@
 package edu.bits.itsm.event.observers;
 
+import edu.bits.itsm.event.AfterCommit;
 import edu.bits.itsm.event.IncidentEvent;
 import edu.bits.itsm.event.IncidentObserver;
 import org.springframework.core.annotation.Order;
@@ -31,6 +32,7 @@ public class DashboardBroadcastObserver implements IncidentObserver {
         payload.put("actor", e.actor());
         payload.put("description", e.description());
         payload.put("at", e.occurredAt().toString());
-        ws.convertAndSend("/topic/incidents", payload);
+        // After commit, so the dashboard's re-fetch of its counters sees this change.
+        AfterCommit.run(() -> ws.convertAndSend("/topic/incidents", payload));
     }
 }

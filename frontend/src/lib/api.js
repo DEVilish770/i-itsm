@@ -9,12 +9,17 @@ export class ApiError extends Error {
 }
 
 export async function api(path, { method = 'GET', body, token } = {}) {
-  const t = token ?? localStorage.getItem('itsm.token')
+  const t = token ?? sessionStorage.getItem('itsm.token')
   const res = await fetch(path, {
     method,
     headers: { 'Content-Type': 'application/json', ...(t ? { Authorization: `Bearer ${t}` } : {}) },
     body: body === undefined ? undefined : JSON.stringify(body)
   })
+  if (res.status === 401 && t) {
+    // The token was rejected (expired, or the backend restarted with a new random JWT key): end this tab's login.
+    sessionStorage.removeItem('itsm.token'); sessionStorage.removeItem('itsm.user')
+    location.assign('/login')
+  }
   const text = await res.text()
   const data = text ? JSON.parse(text) : null
   if (!res.ok) throw new ApiError(res.status, data)

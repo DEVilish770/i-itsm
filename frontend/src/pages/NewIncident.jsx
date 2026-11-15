@@ -87,8 +87,9 @@ export default function NewIncident() {
         <div className="card">
           <h3>🔁 Similar open incidents</h3>
           {!analysis?.similarIncidents?.length && <p className="muted small">Pick a service and describe the problem to check for existing reports.</p>}
+          {/* For other people's incidents an employee gets number, status and similarity only (no id, no title). */}
           {analysis?.similarIncidents?.map((s) => (
-            <div key={s.id} className="feed item">
+            <div key={s.incidentNumber} className="feed item">
               <div className="row spread"><b>{s.incidentNumber}</b><span className={`badge ${s.likelyDuplicate ? 'VIOLATED' : 'AT_RISK'}`}>{s.similarity}% similar</span></div>
               <div className="small">{s.title} <Badge v={s.status} /></div>
             </div>

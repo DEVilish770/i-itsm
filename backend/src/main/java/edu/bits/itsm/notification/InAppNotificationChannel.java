@@ -3,6 +3,7 @@ package edu.bits.itsm.notification;
 import edu.bits.itsm.domain.notification.Notification;
 import edu.bits.itsm.domain.notification.NotificationChannelType;
 import edu.bits.itsm.domain.user.User;
+import edu.bits.itsm.event.AfterCommit;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Component;
 
@@ -25,8 +26,10 @@ public class InAppNotificationChannel implements NotificationChannel {
 
     @Override
     public void deliver(Notification n) {
-        ws.convertAndSend("/topic/user/" + n.getRecipientId(),
-                Map.of("subject", n.getSubject(), "body", n.getBody(), "incidentId", n.getIncidentId() == null ? 0 : n.getIncidentId(),
-                       "eventType", n.getEventType(), "sentAt", n.getSentAt().toString()));
+        String topic = "/topic/user/" + n.getRecipientId();
+        Map<String, Object> payload = Map.of("subject", n.getSubject(), "body", n.getBody(), "incidentId", n.getIncidentId() == null ? 0 : n.getIncidentId(),
+                "eventType", n.getEventType(), "sentAt", n.getSentAt().toString());
+        // The bell re-fetches its list when this push arrives, and the new row is only visible once committed.
+        AfterCommit.run(() -> ws.convertAndSend(topic, payload));
     }
 }

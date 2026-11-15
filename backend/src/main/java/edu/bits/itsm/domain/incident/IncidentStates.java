@@ -16,6 +16,7 @@ import java.util.Set;
  *   NEW → CLASSIFIED → ASSIGNED → ACKNOWLEDGED → IN_PROGRESS ⇄ PENDING_INFO
  *   IN_PROGRESS → RESOLVED → VERIFIED → CLOSED,   RESOLVED → (reopen) IN_PROGRESS
  *   Re-assignment is allowed from ASSIGNED / ACKNOWLEDGED / IN_PROGRESS (escalation).
+ *   Re-classification / priority override after CLASSIFIED is not a transition: see Incident.reclassify.
  */
 public final class IncidentStates {
 

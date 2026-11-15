@@ -4,6 +4,7 @@ import edu.bits.itsm.domain.service.ITService;
 import edu.bits.itsm.domain.sla.SLATracker;
 import edu.bits.itsm.domain.user.Technician;
 import edu.bits.itsm.domain.user.User;
+import edu.bits.itsm.exception.InvalidStateTransitionException;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -147,13 +148,31 @@ public class Incident {
 
     public Set<String> allowedActions() { return state().allowedActions(); }
 
-    /** Attach classification + priority result and move NEW → CLASSIFIED. */
+    /** Attach classification + priority result and move NEW → CLASSIFIED. A refused transition changes nothing. */
     public void classify(IncidentCategory category, Priority priority, int score, String rationale) {
-        this.category = Objects.requireNonNull(category);
-        this.priority = Objects.requireNonNull(priority);
+        Objects.requireNonNull(category, "category");
+        Objects.requireNonNull(priority, "priority");
+        state().classify(this);   // the state guards first: it throws for anything past CLASSIFIED, before any field changes
+        this.category = category;
+        this.priority = priority;
         this.priorityScore = score;
         this.priorityRationale = rationale;
-        state().classify(this);
+    }
+
+    /**
+     * Re-classification and/or priority override after reporting (admin or assigned technician). This is a
+     * correction, not a lifecycle transition: it never changes the status, so it is not routed through the
+     * State pattern. Allowed in every status except CLOSED.
+     */
+    public void reclassify(IncidentCategory category, Priority priority, Integer score, String rationale) {
+        Objects.requireNonNull(category, "category");
+        Objects.requireNonNull(priority, "priority");
+        if (status.isTerminal()) throw new InvalidStateTransitionException(status, "reclassify");
+        this.category = category;
+        this.priority = priority;
+        this.priorityScore = score;
+        this.priorityRationale = rationale;
+        touch();
     }
 
     public void assign(Technician technician)          { state().assign(this, Objects.requireNonNull(technician)); }

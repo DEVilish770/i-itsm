@@ -49,7 +49,7 @@
 2. Why is `IncidentCategory` an entity and not an enum? (admins add categories at runtime — requirement)
 3. Where is inheritance used and where did you deliberately avoid it? (User hierarchy is-a; channels/strategies use interfaces + composition)
 4. How does the admin change the assignment strategy without redeploying? (`StrategyRegistry`, `PUT /api/admin/strategies`)
-5. What happens if the notification observer throws? (bus isolates observers; audit already written first)
+5. What happens if the notification observer throws? (the bus catches and logs the exception, so the other observers still run, and a failure that does not touch the database, such as a WebSocket push, cannot break the request. Be honest about the limit: observers run synchronously inside the service's transaction, so if an observer's database write fails (e.g. saving a `Notification`), Spring marks the transaction rollback-only and the request fails at commit; the incident change and its audit record roll back together. Production fix: write notifications after commit (`@TransactionalEventListener(phase = AFTER_COMMIT)`; the WebSocket pushes already work this way through `AfterCommit`) or in their own `REQUIRES_NEW` transaction / an outbox table)
 6. How is a P1 escalated? (SLAMonitor: unacknowledged → team lead → admins, each audited)
 7. How do you prevent an employee from acting on someone else's incident? (ownership checks in `IncidentService`, three layers of authorization)
 8. Why PostgreSQL over MongoDB? (relational data, joins for reports, integrity)

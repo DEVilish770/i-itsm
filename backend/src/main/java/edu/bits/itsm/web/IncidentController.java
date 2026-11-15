@@ -1,12 +1,16 @@
 package edu.bits.itsm.web;
 
+import edu.bits.itsm.domain.incident.Incident;
 import edu.bits.itsm.domain.incident.IncidentStatus;
 import edu.bits.itsm.domain.incident.Priority;
 import edu.bits.itsm.domain.sla.SLAStatus;
+import edu.bits.itsm.domain.user.Role;
 import edu.bits.itsm.intelligence.CategorySuggestionService;
 import edu.bits.itsm.intelligence.DuplicateDetectionService;
 import edu.bits.itsm.intelligence.ResolutionSuggestionService;
 import edu.bits.itsm.repository.AuditRecordRepository;
+import edu.bits.itsm.security.AuthenticatedUser;
+import edu.bits.itsm.security.CurrentUser;
 import edu.bits.itsm.service.AssignmentService;
 import edu.bits.itsm.service.IncidentService;
 import edu.bits.itsm.web.dto.IncidentRequests.*;
@@ -20,8 +24,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /** Incident lifecycle endpoints. Role checks: URL-level in SecurityConfig + ownership checks in IncidentService. */
 @RestController
@@ -34,11 +40,14 @@ public class IncidentController {
     private final DuplicateDetectionService duplicates;
     private final CategorySuggestionService categories;
     private final ResolutionSuggestionService resolutions;
+    private final CurrentUser currentUser;
 
     public IncidentController(IncidentService incidents, AssignmentService assignment, AuditRecordRepository audit,
-                              DuplicateDetectionService duplicates, CategorySuggestionService categories, ResolutionSuggestionService resolutions) {
+                              DuplicateDetectionService duplicates, CategorySuggestionService categories, ResolutionSuggestionService resolutions,
+                              CurrentUser currentUser) {
         this.incidents = incidents; this.assignment = assignment; this.audit = audit;
         this.duplicates = duplicates; this.categories = categories; this.resolutions = resolutions;
+        this.currentUser = currentUser;
     }
 
     @PostMapping @ResponseStatus(HttpStatus.CREATED)
@@ -107,14 +116,18 @@ public class IncidentController {
     @GetMapping("/{id}/similar")
     public List<Map<String, Object>> similar(@PathVariable Long id) {
         var i = incidents.get(id);
+        AuthenticatedUser me = currentUser.principal();
         return duplicates.findSimilar(i.getService().getId(), i.getTitle(), i.getDescription(), i.getId()).stream()
-                .map(m -> Map.<String, Object>of("id", m.incident().getId(), "incidentNumber", m.incident().getIncidentNumber(),
-                        "title", m.incident().getTitle(), "status", m.incident().getStatus().name(),
-                        "similarity", Math.round(m.similarity() * 100), "likelyDuplicate", m.likelyDuplicate())).toList();
+                .map(m -> matchView(m, me)).toList();
     }
 
     @GetMapping("/{id}/suggested-resolutions")
-    public List<ResolutionSuggestionService.Suggestion> suggestedResolutions(@PathVariable Long id) { return resolutions.suggestFor(incidents.get(id)); }
+    public List<ResolutionSuggestionService.Suggestion> suggestedResolutions(@PathVariable Long id) {
+        var i = incidents.get(id);
+        AuthenticatedUser me = currentUser.principal();
+        // Employees only see resolutions of incidents they reported themselves; other people's stay private.
+        return me.role() == Role.EMPLOYEE ? resolutions.suggestFor(i, other -> reportedBy(other, me)) : resolutions.suggestFor(i);
+    }
 
     /** Pre-submission helper for the "new incident" form: category suggestion + duplicate warning. */
     @PostMapping("/analyze")
@@ -124,10 +137,31 @@ public class IncidentController {
         Object sid = body.get("serviceId");
         List<Map<String, Object>> cats = categories.suggest(title, desc).stream().limit(3).map(s -> Map.<String, Object>of(
                 "categoryId", s.category().getId(), "name", s.category().getName(), "confidence", Math.round(s.confidence() * 100), "keywords", s.matchedKeywords())).toList();
+        AuthenticatedUser me = currentUser.principal();
         List<Map<String, Object>> dups = sid == null ? List.of() : duplicates.findSimilar(Long.valueOf(sid.toString()), title, desc, null).stream()
                 .filter(m -> m.similarity() > 0.15).limit(5)
-                .map(m -> Map.<String, Object>of("id", m.incident().getId(), "incidentNumber", m.incident().getIncidentNumber(), "title", m.incident().getTitle(),
-                        "status", m.incident().getStatus().name(), "similarity", Math.round(m.similarity() * 100), "likelyDuplicate", m.likelyDuplicate())).toList();
+                .map(m -> matchView(m, me)).toList();
         return Map.of("categorySuggestions", cats, "similarIncidents", dups);
+    }
+
+    /**
+     * One similar-incident row. Employees get only what the duplicate warning needs (number, status, similarity):
+     * the title of somebody else's incident is private, so it is included only for their own incidents.
+     */
+    private static Map<String, Object> matchView(DuplicateDetectionService.Match m, AuthenticatedUser me) {
+        Incident other = m.incident();
+        boolean employee = me.role() == Role.EMPLOYEE;
+        Map<String, Object> row = new LinkedHashMap<>();
+        if (!employee) row.put("id", other.getId());
+        row.put("incidentNumber", other.getIncidentNumber());
+        if (!employee || reportedBy(other, me)) row.put("title", other.getTitle());
+        row.put("status", other.getStatus().name());
+        row.put("similarity", Math.round(m.similarity() * 100));
+        row.put("likelyDuplicate", m.likelyDuplicate());
+        return row;
+    }
+
+    private static boolean reportedBy(Incident i, AuthenticatedUser me) {
+        return Objects.equals(i.getReporter().getId(), me.id());
     }
 }

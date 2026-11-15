@@ -154,27 +154,33 @@ public class IncidentService {
         return IncidentDetail.of(incident);
     }
 
+    /**
+     * Re-classify and/or override the priority (admin, or the technician assigned to the incident). This is a
+     * correction outside the lifecycle: allowed in any status except CLOSED, and the status never changes.
+     */
     public IncidentDetail reclassify(Long id, Long categoryId, Priority priorityOverride, String reason) {
         Incident i = get(id);
         User me = currentUser.get();
-        assertRole(me, Role.ADMIN, Role.TECHNICIAN);
-        IncidentCategory cat = categoryId == null ? i.getCategory()
+        assertAssignedOrAdmin(i, me);
+        IncidentCategory previousCategory = i.getCategory();
+        IncidentCategory cat = categoryId == null ? previousCategory
                 : categories.findById(categoryId).orElseThrow(() -> new ResourceNotFoundException("Category", categoryId));
         Priority previous = i.getPriority();
         if (priorityOverride != null) {
-            i.overridePriority(priorityOverride, "Manual override by " + me.getUsername() + ": " + reason);
+            i.reclassify(cat, priorityOverride, i.getPriorityScore(), "Manual override by " + me.getUsername() + ": " + reason);
         } else {
             PriorityResult pr = strategies.priorityStrategy().calculate(new PriorityContext(
                     i.getImpact(), i.getUrgency(), i.getService().getCriticality(), i.getAffectedUsers(), i.getService().getUserBase()));
-            i.overridePriority(pr.priority(), pr.rationale());
+            i.reclassify(cat, pr.priority(), pr.score(), pr.rationale());
         }
-        i.classify(cat, i.getPriority(), i.getPriorityScore() == null ? 0 : i.getPriorityScore(), i.getPriorityRationale());
         if (previous != i.getPriority()) {
-            sla.apply(i, LocalDateTime.now());
+            // The SLA clock only runs while the incident is open; a resolved incident keeps its recorded outcome.
+            if (i.getStatus().isOpen()) sla.apply(i, LocalDateTime.now());
             bus.publish(IncidentEvent.of(IncidentEventType.PRIORITY_CHANGED, i, me.getUsername(),
                     "Priority changed " + previous + " → " + i.getPriority() + ". " + (reason == null ? "" : reason)));
         }
-        bus.publish(IncidentEvent.of(IncidentEventType.CLASSIFIED, i, me.getUsername(), "Re-classified as " + cat.getName()));
+        bus.publish(IncidentEvent.of(IncidentEventType.CLASSIFIED, i, me.getUsername(), "Re-classified as " + cat.getName()
+                + (previousCategory != null && !previousCategory.equals(cat) ? " (was " + previousCategory.getName() + ")" : "")));
         return IncidentDetail.of(i);
     }
 
@@ -263,6 +269,7 @@ public class IncidentService {
     public IncidentDetail updateDetails(Long id, UpdateIncident req) {
         Incident i = get(id); User me = currentUser.get();
         if (me.getRole() == Role.EMPLOYEE && !i.isReportedBy(me)) throw new UnauthorizedOperationException("Not your incident");
+        if (me.getRole() == Role.TECHNICIAN && !i.isAssignedTo(me)) throw new UnauthorizedOperationException("Incident not assigned to you");
         Impact oldImpact = i.getImpact(); Urgency oldUrg = i.getUrgency();
         i.updateDetails(req.title(), req.description(), req.impact(), req.urgency(), req.affectedUsers() == null ? -1 : req.affectedUsers());
         if (oldImpact != i.getImpact() || oldUrg != i.getUrgency()) {

@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '../lib/api.js'
+import { useAuth } from '../lib/auth.jsx'
+import { subscribe } from '../lib/ws.js'
 
 export const Badge = ({ v, cls = '' }) => (v ? <span className={`badge ${v} ${cls}`}>{String(v).replace(/_/g, ' ')}</span> : null)
 
@@ -53,21 +55,39 @@ export function Modal({ title, onClose, children }) {
 }
 
 export function Bell() {
+  const { user } = useAuth()
   const [open, setOpen] = useState(false)
   const { data, reload } = useLoad(() => api('/api/notifications'), [open])
-  const unread = (data || []).filter((n) => !n.read).length
-  useEffect(() => { const id = setInterval(reload, 15000); return () => clearInterval(id) }, []) // eslint-disable-line
-  async function readAll() { await api('/api/notifications/read-all', { method: 'POST' }); reload() }
+  // The list also holds the EMAIL / SMS copies of each event; the bell shows and counts in-app rows only.
+  const inApp = (data || []).filter((n) => n.channel === 'IN_APP')
+  const unread = inApp.filter((n) => !n.read).length
+  // Live: the backend pushes each in-app notification to /topic/user/{id}; refetch the list when one arrives.
+  // The slow poll is only a safety net for pushes missed while the connection was down.
+  useEffect(() => {
+    if (!user?.id) return undefined
+    const unsub = subscribe(`/topic/user/${user.id}`, () => reload())
+    const id = setInterval(reload, 60000)
+    return () => { unsub(); clearInterval(id) }
+  }, [user?.id]) // eslint-disable-line
+  const [readErr, setReadErr] = useState(null)
+  async function readAll() {
+    // Say so when the server can't be reached, instead of failing silently.
+    try { setReadErr(null); await api('/api/notifications/read-all', { method: 'POST' }); reload() }
+    catch (e) { setReadErr(e.message || 'Could not reach the server') }
+  }
   return (
     <div className="bell" style={{ position: 'relative' }}>
       <button onClick={() => setOpen(!open)}>🔔 Notifications{unread > 0 && <span className="count">{unread}</span>}</button>
       {open && (
         <div className="card dropdown">
-          <div className="row spread"><b>In-app notifications</b><button className="sm" onClick={readAll}>Mark all read</button></div>
-          {(data || []).filter((n) => n.channel === 'IN_APP').length === 0 && <p className="muted">Nothing yet.</p>}
-          {(data || []).filter((n) => n.channel === 'IN_APP').map((n) => (
-            <div key={n.id} className="feed item" style={{ opacity: n.read ? .6 : 1 }}>
-              <div><b>{n.subject}</b></div><div className="small">{n.body}</div><div className="t">{new Date(n.sentAt).toLocaleString()}</div>
+          <div className="row spread"><b>In-app notifications{unread > 0 ? ` (${unread} new)` : ''}</b>
+            <button className="sm" onClick={readAll} disabled={unread === 0}>{unread > 0 ? 'Mark all read' : 'All read ✓'}</button></div>
+          {readErr && <p className="small" style={{ color: '#b42318' }}>{readErr}</p>}
+          {inApp.length === 0 && <p className="muted">Nothing yet.</p>}
+          {inApp.map((n) => (
+            // Unread rows stand out (accent bar + bold); read rows fade, so "Mark all read" is visible at a glance.
+            <div key={n.id} className="feed item" style={{ opacity: n.read ? .5 : 1, borderLeft: n.read ? '3px solid transparent' : '3px solid #2563eb', paddingLeft: '.5rem' }}>
+              <div>{n.read ? n.subject : <b>{n.subject}</b>}</div><div className="small">{n.body}</div><div className="t">{new Date(n.sentAt).toLocaleString()}</div>
             </div>
           ))}
         </div>

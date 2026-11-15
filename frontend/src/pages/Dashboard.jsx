@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api.js'
 import { Badge, Stat, useLoad } from '../components/ui.jsx'
-import { subscribe } from '../lib/ws.js'
+import { onConnectionChange, subscribe } from '../lib/ws.js'
 
 /** Real-time operations dashboard: counters refresh on every WebSocket event; event feed streams live. */
 export default function Dashboard() {
@@ -14,24 +14,30 @@ export default function Dashboard() {
   const [connected, setConnected] = useState(false)
 
   useEffect(() => {
+    const refresh = () => { reload(); reloadOpen(); reloadLoad() }
     const unsub = subscribe('/topic/incidents', (ev) => {
-      setConnected(true)
       setFeed((f) => (f[0] && f[0].type === ev.type && f[0].incidentId === ev.incidentId && f[0].at === ev.at) ? f : [ev, ...f].slice(0, 40))
-      reload(); reloadOpen(); reloadLoad()
+      refresh()
     })
-    const t = setTimeout(() => setConnected(true), 1500)
-    return () => { unsub(); clearTimeout(t) }
+    // The badge follows the real STOMP connection. After a drop, refresh once: events sent while offline were missed.
+    let wasLive = false
+    const offConn = onConnectionChange((live) => {
+      setConnected(live)
+      if (live && wasLive) refresh()
+      if (live) wasLive = true
+    })
+    return () => { unsub(); offConn() }
   }, []) // eslint-disable-line
 
   async function runMonitor() { await api('/api/admin/sla/run-monitor', { method: 'POST' }); reload(); reloadOpen() }
 
   return (
     <div className="stack">
-      <div className="row spread"><h1>Live operations dashboard</h1><div className="row"><span className="live">{connected ? 'live via WebSocket' : 'connecting…'}</span><button className="sm" onClick={runMonitor}>Run SLA monitor now</button></div></div>
+      <div className="row spread"><h1>Live operations dashboard</h1><div className="row"><span className={connected ? 'live' : 'live off'}>{connected ? 'live via WebSocket' : 'connecting…'}</span><button className="sm" onClick={runMonitor}>Run SLA monitor now</button></div></div>
       <div className="grid cols-5">
         <Stat label="Total incidents" value={ov?.totalIncidents} />
         <Stat label="Open" value={ov?.openIncidents} />
-        <Stat label="Critical (P1)" value={ov?.criticalIncidents} tone={ov?.criticalIncidents ? 'bad' : ''} />
+        <Stat label="Critical open (P1)" value={ov?.criticalIncidents} tone={ov?.criticalIncidents ? 'bad' : ''} />
         <Stat label="SLA at risk" value={ov?.slaAtRisk} tone={ov?.slaAtRisk ? 'warn' : ''} />
         <Stat label="SLA violations" value={ov?.slaViolations} tone={ov?.slaViolations ? 'bad' : 'ok'} />
       </div>

@@ -16,7 +16,7 @@ import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** TC-01 .. TC-07: State pattern — legal lifecycle and rejected transitions (business rules). */
+/** TC-01 .. TC-08, TC-34, TC-35: State pattern — legal lifecycle, rejected transitions (business rules) and re-classification. */
 class IncidentLifecycleTest {
 
     private Incident incident;
@@ -117,5 +117,32 @@ class IncidentLifecycleTest {
         assertThrows(NullPointerException.class, () -> new Incident("t", "d", null, s, Impact.LOW, Urgency.LOW, 0));
         assertThrows(NullPointerException.class, () -> new Incident("t", "d", r, null, Impact.LOW, Urgency.LOW, 0));
         assertEquals(0, new Incident("t", "d", r, s, Impact.LOW, Urgency.LOW, -5).getAffectedUsers(), "negative counts clamp to 0");
+    }
+
+    @Test @DisplayName("TC-34 Re-classification is not a lifecycle transition: allowed after assignment (status kept), refused once CLOSED")
+    void reclassifyOutsideLifecycle() {
+        incident.classify(category, Priority.P3, 10, "t"); incident.assign(tech); incident.acknowledge();
+        IncidentCategory network = new IncidentCategory("NETWORK", "", "");
+        incident.reclassify(network, Priority.P1, 40, "admin override");
+        assertEquals(IncidentStatus.ACKNOWLEDGED, incident.getStatus(), "re-classifying must not move the lifecycle");
+        assertSame(network, incident.getCategory());
+        assertEquals(Priority.P1, incident.getPriority());
+
+        incident.startInvestigation();
+        incident.resolve(new Resolution("fixed", null, "t", LocalDateTime.now()));
+        incident.close(null, "done");
+        assertThrows(InvalidStateTransitionException.class, () -> incident.reclassify(category, Priority.P4, 1, "too late"));
+        assertSame(network, incident.getCategory(), "a refused re-classification changes nothing");
+        assertEquals(Priority.P1, incident.getPriority());
+    }
+
+    @Test @DisplayName("TC-35 Business rule: a refused classify leaves category, priority and score untouched")
+    void refusedClassifyMutatesNothing() {
+        incident.classify(category, Priority.P2, 20, "t"); incident.assign(tech);
+        IncidentCategory other = new IncidentCategory("NETWORK", "", "");
+        assertThrows(InvalidStateTransitionException.class, () -> incident.classify(other, Priority.P4, 1, "late"));
+        assertSame(category, incident.getCategory());
+        assertEquals(Priority.P2, incident.getPriority());
+        assertEquals(20, incident.getPriorityScore());
     }
 }

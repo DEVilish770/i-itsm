@@ -20,7 +20,7 @@ server:
 
 itsm:
   jwt:
-    secret: ${JWT_SECRET:change-me-to-a-long-random-string-at-least-32-bytes!!}
+    secret: ${JWT_SECRET:}       # no committed default: unset = random key per start (see JwtService)
     ttl-minutes: 480
   sla:
     monitor-seconds: ${SLA_MONITOR_SECONDS:30}

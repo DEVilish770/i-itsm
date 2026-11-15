@@ -49,15 +49,16 @@ public class SLATracker {
 
     public SLATracker() { }
 
-    /** (Re)starts the SLA clock from {@code from} using the given policy. */
+    /**
+     * (Re)starts the SLA clock from {@code from} using the given policy. A breach that was already recorded is
+     * kept: re-applying a policy (e.g. after a priority change) gives new deadlines but never erases history.
+     */
     public void applyPolicy(SLAPolicy policy, LocalDateTime from) {
         this.startedAt = from;
         this.responseDeadline = from.plusMinutes(policy.getResponseMinutes());
         this.resolutionDeadline = from.plusMinutes(policy.getResolutionMinutes());
-        this.status = SLAStatus.ON_TRACK;
+        this.status = isViolated() ? SLAStatus.VIOLATED : SLAStatus.ON_TRACK;
         this.warningSent = false;
-        this.responseViolated = false;
-        this.resolutionViolated = false;
     }
 
     /** First technician response (acknowledgement). Idempotent. */

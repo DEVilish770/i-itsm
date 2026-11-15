@@ -26,7 +26,8 @@ public class ReportService {
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("totalIncidents", incidents.count());
         m.put("openIncidents", incidents.countByStatusIn(OPEN));
-        m.put("criticalIncidents", incidents.countByPriority(Priority.P1));
+        // "Critical open": P1s still being worked; resolved, verified and closed ones are finished.
+        m.put("criticalIncidents", incidents.countByPriorityAndStatusIn(Priority.P1, OPEN));
         m.put("resolvedIncidents", incidents.countByStatusIn(List.of(IncidentStatus.RESOLVED, IncidentStatus.VERIFIED, IncidentStatus.CLOSED)));
         m.put("slaViolations", incidents.countBySlaStatus(SLAStatus.VIOLATED));
         m.put("slaAtRisk", incidents.countBySlaStatus(SLAStatus.AT_RISK));

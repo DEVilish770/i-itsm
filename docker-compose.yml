@@ -21,9 +21,15 @@ services:
       DB_URL: jdbc:postgresql://db:5432/itsm
       DB_USER: itsm
       DB_PASSWORD: itsm
-      JWT_SECRET: ${JWT_SECRET:-replace-this-with-a-random-64-char-secret-before-any-real-deployment!!}
-      SLA_MONITOR_SECONDS: 15
-      ESCALATION_MINUTES: 5
+      # No committed fallback. Unset = random signing key per start (everyone signs in again after a restart);
+      # to keep logins across restarts, set JWT_SECRET (32+ bytes) in your shell or in a .env file next to this one.
+      JWT_SECRET: ${JWT_SECRET:-}
+      # Demo speed: SLA sweep every 10 s, unacknowledged P1/P2 escalate after 2 min (app defaults: 30 s / 10 min)
+      SLA_MONITOR_SECONDS: 10
+      ESCALATION_MINUTES: 2
+      # Timestamps are stored and sent without a zone, so the backend clock must match the users' (IST)
+      TZ: Asia/Kolkata
+      JAVA_TOOL_OPTIONS: "-Duser.timezone=Asia/Kolkata"
     ports: ["8080:8080"]
     depends_on:
       db:

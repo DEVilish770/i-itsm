@@ -2,6 +2,7 @@ package edu.bits.itsm.web;
 
 import edu.bits.itsm.config.StrategyRegistry;
 import edu.bits.itsm.domain.notification.Notification;
+import edu.bits.itsm.domain.notification.NotificationChannelType;
 import edu.bits.itsm.repository.ITServiceRepository;
 import edu.bits.itsm.repository.IncidentCategoryRepository;
 import edu.bits.itsm.repository.NotificationRepository;
@@ -62,8 +63,11 @@ public class CatalogController {
         return notifications.findTop50ByRecipientIdOrderBySentAtDesc(currentUser.get().getId()).stream().map(NotificationView::of).toList();
     }
 
+    /** The bell's count: in-app rows only (the EMAIL / SMS copies of the same event are not "unread" items). */
     @GetMapping("/notifications/unread-count")
-    public Map<String, Long> unread() { return Map.of("unread", notifications.countByRecipientIdAndReadFalse(currentUser.get().getId())); }
+    public Map<String, Long> unread() {
+        return Map.of("unread", notifications.countByRecipientIdAndChannelAndReadFalse(currentUser.get().getId(), NotificationChannelType.IN_APP));
+    }
 
     @PostMapping("/notifications/{id}/read")
     public void markRead(@PathVariable Long id) {

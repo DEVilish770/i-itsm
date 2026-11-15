@@ -11,7 +11,7 @@ import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-/** TC-09 .. TC-12: SLA calculation, deadline tracking, warning threshold and violation detection. */
+/** TC-09 .. TC-13, TC-36: SLA calculation, deadline tracking, warning threshold, violation detection and re-application. */
 class SLATrackerTest {
 
     private final LocalDateTime t0 = LocalDateTime.of(2026, 11, 4, 10, 0);
@@ -64,5 +64,17 @@ class SLATrackerTest {
         assertThrows(IllegalArgumentException.class, () -> new SLAPolicy(Priority.P3, 0, 60));
         assertThrows(IllegalArgumentException.class, () -> new SLAPolicy(Priority.P3, 10, -1));
         assertThrows(IllegalArgumentException.class, () -> p1.setWarningThresholdPct(100));
+    }
+
+    @Test @DisplayName("TC-36 Re-applying a policy (priority change) restarts the deadlines but keeps a recorded breach")
+    void reapplyKeepsBreach() {
+        SLATracker s = new SLATracker();
+        s.applyPolicy(p1, t0);
+        assertTrue(s.evaluate(t0.plusMinutes(6), 25), "response deadline missed → breach recorded");
+        s.applyPolicy(new SLAPolicy(Priority.P2, 15, 120), t0.plusMinutes(7));
+        assertEquals(t0.plusMinutes(7 + 120), s.getResolutionDeadline(), "deadlines restart from the re-application");
+        assertTrue(s.isResponseViolated(), "the recorded breach is history and must survive");
+        assertEquals(SLAStatus.VIOLATED, s.getStatus());
+        assertFalse(s.evaluate(t0.plusMinutes(8), 25), "no second VIOLATED transition, so no duplicate alert");
     }
 }

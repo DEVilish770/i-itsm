@@ -29,6 +29,7 @@ public interface IncidentRepository extends JpaRepository<Incident, Long>, JpaSp
 
     long countByStatusIn(Collection<IncidentStatus> statuses);
     long countByPriority(Priority priority);
+    long countByPriorityAndStatusIn(Priority priority, Collection<IncidentStatus> statuses);
     long countByStatus(IncidentStatus status);
     long countBySlaStatus(SLAStatus status);
 

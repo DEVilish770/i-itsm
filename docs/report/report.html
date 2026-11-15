@@ -87,7 +87,7 @@
   <li><b>SLA violations</b> → per-priority SLA policies, deadline tracking, background monitor that raises warnings before breach, records violations and escalates unacknowledged critical incidents.</li>
   <li><b>Poor visibility</b> → real-time WebSocket operations dashboard, reports (overview, workload, service/category analysis, MTTA/MTTR, compliance).</li>
   <li><b>Duplicate reports</b> → text-similarity duplicate detection at submission time, with related-incident linking.</li>
-  <li><b>Incomplete history</b> → every event is written to an immutable audit trail by an observer; nothing is lost even if a notification fails.</li>
+  <li><b>Incomplete history</b> → every event is written to an immutable audit trail by an observer, in the same transaction as the change, so the change and its history commit or roll back together.</li>
   <li><b>Recurring problems</b> → suggested resolutions from similar resolved incidents; category/service analytics.</li>
 </ul>
 
@@ -400,7 +400,7 @@ P1 if score ≥ 36   P2 if ≥ 18   P3 if ≥ 8   else P4</pre>
   <tr><td>TC-32</td><td>Normal</td><td>Search by status, priority+text, unknown service; admin overview and performance</td><td>Counts correct; average feedback 5.0</td><td>Pass</td></tr>
   <tr><td>TC-33</td><td>Exception</td><td>Unknown incident id; assign to unknown technician; switch strategy; unknown strategy</td><td>404; 404; 200 and active = LOAD_BALANCED; 404</td><td>Pass</td></tr>
 </table>
-<p><b>Manual / exploratory tests performed:</b> end-to-end smoke script over HTTP against both H2 and PostgreSQL (full lifecycle, duplicate, authorisation, strategy switching); SLA warning → violation → automatic escalation to the team lead with a 1 min / 2 min policy; live dashboard receiving events over WebSocket from a second browser session; all UI pages exercised with a Playwright script (screenshots in §11).</p>
+<p><b>Manual / exploratory tests performed:</b> end-to-end smoke script over HTTP against both H2 and PostgreSQL (full lifecycle, duplicate, authorisation, strategy switching); SLA warning → violation → automatic escalation to the team lead with a 1 min / 2 min policy; live dashboard receiving events over WebSocket from a second browser session. Screenshots of the UI pages are in §11.</p>
 <pre>$ mvn test
 Tests run: 44, Failures: 0, Errors: 0, Skipped: 0  —  BUILD SUCCESS</pre>
 
@@ -419,14 +419,14 @@ Tests run: 44, Failures: 0, Errors: 0, Skipped: 0  —  BUILD SUCCESS</pre>
   <tr><th>Member</th><th>Primary responsibility</th><th>Deliverables owned</th></tr>
   <tr><td>[Member 1 — Name, ID]</td><td>Domain model &amp; OOP design</td><td>User hierarchy, Incident aggregate, State pattern, Strategy pattern (priority &amp; assignment), custom exceptions, domain unit tests (TC-01–TC-21), class diagrams, §5 and §8 of this report</td></tr>
   <tr><td>[Member 2 — Name, ID]</td><td>Backend services, API &amp; persistence</td><td>Spring Boot services, REST controllers, JWT security, Observer event bus and notification channels, SLA monitor &amp; escalation, intelligent features, PostgreSQL schema, integration tests (TC-24–TC-33), Docker Compose, §3, §6, §7, §9</td></tr>
-  <tr><td>[Member 3 — Name, ID]</td><td>Frontend, UX, testing &amp; documentation</td><td>React application (all pages), WebSocket live dashboard, UI testing with Playwright, use-case/ER/state diagrams, problem analysis and requirements (§1, §2), test documentation (§10), demo video editing and submission</td></tr>
+  <tr><td>[Member 3 — Name, ID]</td><td>Frontend, UX, testing &amp; documentation</td><td>React application (all pages), WebSocket live dashboard, use-case/ER/state diagrams, problem analysis and requirements (§1, §2), test documentation (§10), demo video editing and submission</td></tr>
 </table>
 <p>Every member can explain the whole system: the demo video is split so that each member presents one complete workflow end to end, and code reviews were done across areas.</p>
 
 <h1>13. Innovation Challenge, Limitations &amp; Future Work</h1>
 <h2>13.1 Innovation features implemented</h2>
 <ul>
-  <li><b>Real-time operational dashboard</b> — STOMP over WebSocket; every domain event is pushed to all connected administrators and in-app notifications to the affected user, without polling.</li>
+  <li><b>Real-time operational dashboard</b> — STOMP over WebSocket; every domain event is pushed to all connected administrators, and each in-app notification to the affected user's bell, the moment it happens (the bell keeps a slow 60-second refresh only as a fallback for pushes missed while the connection was down); the client re-subscribes after every reconnect.</li>
   <li><b>Automated incident escalation</b> — background engine with a Technician → Team lead → Administrator chain.</li>
   <li><b>Predictive SLA violation detection</b> — at-risk warnings at a configurable fraction of the window.</li>
   <li><b>Incident similarity detection</b> — token-based Jaccard similarity for duplicates, correlation and suggested resolutions.</li>
@@ -439,7 +439,7 @@ Tests run: 44, Failures: 0, Errors: 0, Skipped: 0  —  BUILD SUCCESS</pre>
   <li>SLA clocks ignore business hours and holidays.</li>
   <li>Similarity is lexical; synonyms ("mail" vs "email") are handled only through category keywords.</li>
   <li>The in-memory STOMP broker and the scheduler assume a single backend instance.</li>
-  <li>No frontend unit tests; UI verified by scripted browser runs.</li>
+  <li>No automated frontend tests (neither unit nor scripted browser tests).</li>
 </ul>
 <h2>13.3 Future work</h2>
 <ul>
@@ -468,8 +468,8 @@ cd backend && mvn test</pre>
   <tr><td>POST /api/incidents/analyze</td><td>any</td><td>Live category suggestions + similar incidents for the form</td></tr>
   <tr><td>GET /api/incidents?q&amp;status&amp;priority&amp;categoryId&amp;serviceId&amp;technicianId&amp;slaStatus&amp;from&amp;to&amp;page&amp;size&amp;sort</td><td>any (scoped by role)</td><td>Search &amp; filter</td></tr>
   <tr><td>GET /api/incidents/{id} · /history · /similar · /recommendations · /suggested-resolutions · /mine · /queue</td><td>any (ownership enforced)</td><td>Detail, audit trail, intelligence, my lists</td></tr>
-  <tr><td>PUT /api/incidents/{id}</td><td>reporter, Admin</td><td>Update details (priority re-evaluated)</td></tr>
-  <tr><td>POST /api/incidents/{id}/classify · /assign · /auto-assign</td><td>Admin (classify also Technician)</td><td>Re-classify / override priority; manual or strategy assignment</td></tr>
+  <tr><td>PUT /api/incidents/{id}</td><td>reporter, assigned Technician, Admin</td><td>Update details (priority re-evaluated)</td></tr>
+  <tr><td>POST /api/incidents/{id}/classify · /assign · /auto-assign</td><td>Admin (classify also the assigned Technician)</td><td>Re-classify / override priority (any status except CLOSED, status unchanged); manual or strategy assignment</td></tr>
   <tr><td>POST /api/incidents/{id}/acknowledge · /start · /notes · /request-info · /resolve</td><td>assigned Technician, Admin</td><td>Investigation workflow</td></tr>
   <tr><td>POST /api/incidents/{id}/provide-info · /verify · /reopen · /close · /feedback</td><td>reporter, Admin</td><td>Reporter workflow</td></tr>
   <tr><td>GET /api/services · /categories · /technicians · /sla-policies · /strategies · /notifications</td><td>any</td><td>Reference data, own notifications</td></tr>
