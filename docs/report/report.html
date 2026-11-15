@@ -28,6 +28,12 @@
   .small { font-size: 9.5pt; }
   ul, ol { margin: 4px 0 8px 22px; }
   .kv td:first-child { width: 28%; font-weight: bold; background: #f7f9fc; }
+  table.tests { table-layout: fixed; }
+  table.tests th:nth-child(1) { width: 9%; } table.tests th:nth-child(2) { width: 15%; } table.tests th:nth-child(3) { width: 36%; }
+  table.tests th:nth-child(4) { width: 31%; } table.tests th:nth-child(5) { width: 9%; }
+  table.tests td { overflow-wrap: anywhere; }
+  table.tests td:first-child, table.tests td:last-child { white-space: nowrap; overflow-wrap: normal; }
+  table.tests td code { overflow-wrap: anywhere; }
 </style>
 </head>
 <body>
@@ -39,8 +45,8 @@
   <p class="sub">Project Report</p>
   <table class="kv">
     <tr><td>Group number</td><td>[Group No.]</td></tr>
-    <tr><td>Members</td><td>[Member 1 — Name, ID]<br>[Member 2 — Name, ID]<br>[Member 3 — Name, ID]</td></tr>
-    <tr><td>Source code</td><td>[GitHub repository URL]</td></tr>
+    <tr><td>Members</td><td>Dev Dubey (2025A7IS2413H)<br>Bheemanathi Rahul Kumar (2025A7PS0011H)<br>Hitesh MP (2025A7PS0073H)</td></tr>
+    <tr><td>Source code</td><td><a href="https://github.com/DEVilish770/i-itsm">https://github.com/DEVilish770/i-itsm</a></td></tr>
     <tr><td>Technology</td><td>Java 17 · Spring Boot 3.3 · React 18 · PostgreSQL 16 · Docker</td></tr>
     <tr><td>Submission date</td><td>November 2026</td></tr>
   </table>
@@ -151,7 +157,7 @@
   <tr><td>Performance</td><td>Lists paged; workload computed by count queries, not by loading incidents; DB indexes on status, priority, service, technician</td><td>JPA Specifications + Pageable; <code>@Index</code> annotations</td></tr>
   <tr><td>Usability</td><td>Role-specific navigation; state-aware action buttons; live suggestions while typing</td><td>React UI driven by <code>allowedActions</code> from the API</td></tr>
   <tr><td>Portability</td><td>Runs with one command anywhere</td><td>Docker Compose; H2 <code>dev</code> profile needs no database install</td></tr>
-  <tr><td>Testability</td><td>Core rules unit-testable without a database</td><td>Pure domain/strategy classes; 44 automated tests</td></tr>
+  <tr><td>Testability</td><td>Core rules unit-testable without a database</td><td>Pure domain/strategy classes; 53 automated tests</td></tr>
 </table>
 
 <h2>2.4 Business rules</h2>
@@ -232,7 +238,7 @@
   <tr><td>Database</td><td>PostgreSQL 16; H2 2.x in PostgreSQL mode for dev/tests</td><td>Durable relational store; zero-setup development</td></tr>
   <tr><td>Frontend</td><td>React 18, Vite 5, React Router 6, @stomp/stompjs 7, hand-written CSS</td><td>Role-based SPA with live dashboard</td></tr>
   <tr><td>Build / run</td><td>Maven 3.9, npm, Docker &amp; Docker Compose, nginx</td><td>Reproducible builds and one-command deployment</td></tr>
-  <tr><td>Testing</td><td>JUnit 5, Spring Boot Test, MockMvc, Hamcrest, JUnit Params</td><td>Unit + integration tests (44 tests)</td></tr>
+  <tr><td>Testing</td><td>JUnit 5, Spring Boot Test, MockMvc, Hamcrest, JUnit Params</td><td>Unit + integration tests (53 tests)</td></tr>
   <tr><td>Documentation</td><td>Mermaid, Graphviz</td><td>UML/ER/architecture diagrams</td></tr>
 </table>
 
@@ -269,6 +275,26 @@
   <li><b>100×:</b> replace the in-memory STOMP broker with RabbitMQ/Redis so WebSocket fan-out works across instances; publish <code>IncidentEvent</code>s to Kafka so audit, notification and analytics become separate consumers (the Observer interface stays the same); index and partition <code>audit_records</code> and <code>notifications</code> by time; move search to Elasticsearch/OpenSearch and compute duplicate similarity with TF-IDF/embeddings there.</li>
   <li><b>Organisationally:</b> split by bounded context into services — identity, incident workflow, notification, analytics — along the package boundaries that already exist; introduce Flyway migrations, observability (Micrometer/Prometheus), rate limiting and refresh tokens.</li>
 </ul>
+
+<h2>6.3 Docker: what it is and why we use it</h2>
+<p><b>What Docker is.</b> Docker packages an application together with everything it needs to run (the language runtime, libraries, system packages and configuration) into an <i>image</i>. A running instance of an image is a <i>container</i>: an isolated process with its own file system and network that shares the host's operating-system kernel. Because no guest operating system is booted, containers start in seconds and use far less memory than virtual machines. <b>Docker Compose</b> describes a multi-container application in one file, <code>docker-compose.yml</code>, and starts all of it with one command.</p>
+<p><b>How I-ITSM uses it.</b> The system has three parts with different runtimes, and each runs in its own container:</p>
+<table>
+  <tr><th>Container</th><th>Image</th><th>Role</th></tr>
+  <tr><td><code>db</code></td><td><code>postgres:16-alpine</code></td><td>PostgreSQL database. A named volume (<code>pgdata</code>) keeps the data across restarts, and a health check (<code>pg_isready</code>) reports when it is ready.</td></tr>
+  <tr><td><code>backend</code></td><td>built from <code>backend/Dockerfile</code></td><td>Spring Boot API on port 8080. Compiled with Maven on a JDK 17 image, then run on a slim Java 17 runtime image (a multi-stage build). Starts only after the database is healthy.</td></tr>
+  <tr><td><code>frontend</code></td><td>built from <code>frontend/Dockerfile</code></td><td>React application compiled with Node 22, then served as static files by nginx, published on port 5173.</td></tr>
+</table>
+<p><b>Why we use it.</b></p>
+<ul>
+  <li><b>One command on any machine.</b> <code>docker compose up --build</code> builds and starts the database, backend and frontend with the exact versions they need. Without Docker, every teammate and evaluator would have to install and configure Java 17, Maven, Node.js and PostgreSQL by hand; a laptop whose default Java is 11, for example, cannot build the backend at all.</li>
+  <li><b>Reproducible results.</b> The demo, the tests and the evaluators' run use the same images, which removes "it works on my machine" differences between laptops and operating systems.</li>
+  <li><b>Configuration without code changes.</b> Database credentials, the JWT signing secret, the time zone (IST) and the demo-speed SLA and escalation timers are passed as environment variables, so the same image runs in development, in the demo and in production with different settings.</li>
+  <li><b>Correct start-up order.</b> The backend waits for the database's health check, so it never starts against a database that is not yet accepting connections.</li>
+  <li><b>Small, focused images.</b> Multi-stage builds keep compilers and build tools out of the final images: the backend ships only a Java runtime and one JAR, and the frontend only nginx and the compiled files.</li>
+  <li><b>A path to deployment and scaling.</b> The same images can run unchanged on a cloud server or a container orchestrator, and because the backend is stateless (JWT), several backend containers can run behind a load balancer (question 9 above).</li>
+</ul>
+<p>For quick development without Docker, the <code>dev</code> profile runs the backend on an in-memory H2 database (README, option B). Docker is used for the full stack with PostgreSQL, for the demo and for evaluation.</p>
 
 <h1>7. Database Design</h1>
 <h2>7.1 ER diagram</h2>
@@ -363,14 +389,14 @@ P1 if score ≥ 36   P2 if ≥ 18   P3 if ≥ 8   else P4</pre>
 <p>All errors share one JSON shape — <code>{ timestamp, status, code, message, fields?, candidates? }</code> — so the frontend handles them uniformly.</p>
 
 <h1>10. Testing</h1>
-<p>44 automated tests (33 documented cases, several parameterised) run with <code>mvn test</code> in about 12 seconds: pure unit tests for the domain and strategies (no Spring, no database) and integration tests through the real HTTP stack (security filter, controllers, services, H2 database, observers) using the seeded accounts. All pass.</p>
-<table>
+<p>53 automated tests (33 documented cases, several parameterised) run with <code>mvn test</code> in about 12 seconds: pure unit tests for the domain and strategies (no Spring, no database) and integration tests through the real HTTP stack (security filter, controllers, services, H2 database, observers) using the seeded accounts. All pass.</p>
+<table class="tests">
   <tr><th>ID</th><th>Category</th><th>Test case</th><th>Expected result</th><th>Status</th></tr>
-  <tr><td>TC-01</td><td>Normal</td><td>Full lifecycle NEW→CLASSIFIED→ASSIGNED→ACKNOWLEDGED→IN_PROGRESS→RESOLVED→VERIFIED→CLOSED</td><td>Each transition succeeds; SLA response stamped on acknowledge; closed incident allows no actions</td><td>Pass</td></tr>
-  <tr><td>TC-02</td><td>Business rule</td><td>Close an incident in NEW</td><td><code>InvalidStateTransitionException</code>; state unchanged</td><td>Pass</td></tr>
+  <tr><td>TC-01</td><td>Normal</td><td>Full lifecycle NEW→<wbr>CLASSIFIED→<wbr>ASSIGNED→<wbr>ACKNOWLEDGED→<wbr>IN_PROGRESS→<wbr>RESOLVED→<wbr>VERIFIED→<wbr>CLOSED</td><td>Each transition succeeds; SLA response stamped on acknowledge; closed incident allows no actions</td><td>Pass</td></tr>
+  <tr><td>TC-02</td><td>Business rule</td><td>Close an incident in NEW</td><td><code>Invalid<wbr>State<wbr>Transition<wbr>Exception</code>; state unchanged</td><td>Pass</td></tr>
   <tr><td>TC-03</td><td>Business rule</td><td>Resolve while ASSIGNED (not yet acknowledged)</td><td>Rejected</td><td>Pass</td></tr>
   <tr><td>TC-04</td><td>Business rule</td><td>Assign an unclassified (NEW) incident</td><td>Rejected</td><td>Pass</td></tr>
-  <tr><td>TC-05</td><td>Normal</td><td>Request info → PENDING_INFO; resolve while pending; provide info → IN_PROGRESS</td><td>Pending blocks resolve; reply returns to IN_PROGRESS</td><td>Pass</td></tr>
+  <tr><td>TC-05</td><td>Normal</td><td>Request info →<wbr> PENDING_INFO; resolve while pending; provide info →<wbr> IN_PROGRESS</td><td>Pending blocks resolve; reply returns to IN_PROGRESS</td><td>Pass</td></tr>
   <tr><td>TC-06</td><td>Boundary</td><td>Reopen a RESOLVED incident</td><td>Back to IN_PROGRESS; resolvedAt cleared</td><td>Pass</td></tr>
   <tr><td>TC-07</td><td>Invalid input</td><td>Feedback before resolution; rating 0 and 6; rating 4 after resolution</td><td>First three rejected; last stored</td><td>Pass</td></tr>
   <tr><td>TC-08</td><td>Invalid input</td><td>Incident with blank title/description, null reporter/service, negative affected users</td><td>Exceptions; negative count clamps to 0</td><td>Pass</td></tr>
@@ -396,7 +422,7 @@ P1 if score ≥ 36   P2 if ≥ 18   P3 if ≥ 8   else P4</pre>
   <tr><td>TC-28</td><td>Intelligent</td><td>Similar report on same service; then with forceCreate</td><td>409 DUPLICATE_INCIDENT with candidates; then 201 linked to original</td><td>Pass</td></tr>
   <tr><td>TC-29</td><td>Authorization</td><td>Employee and a different technician try to acknowledge</td><td>403 UNAUTHORIZED_OPERATION</td><td>Pass</td></tr>
   <tr><td>TC-30</td><td>Exception</td><td>Resolve over HTTP before acknowledging</td><td>409 INVALID_STATE_TRANSITION</td><td>Pass</td></tr>
-  <tr><td>TC-31</td><td>Normal (integration)</td><td>Acknowledge → start → request info → reporter replies → resolve → verify → feedback → close; check notifications</td><td>Statuses as expected; SLA MET; EMAIL and IN_APP notifications incl. "resolved"</td><td>Pass</td></tr>
+  <tr><td>TC-31</td><td>Normal (integration)</td><td>Acknowledge →<wbr> start →<wbr> request info →<wbr> reporter replies →<wbr> resolve →<wbr> verify →<wbr> feedback →<wbr> close; check notifications</td><td>Statuses as expected; SLA MET; EMAIL and IN_APP notifications incl. "resolved"</td><td>Pass</td></tr>
   <tr><td>TC-32</td><td>Normal</td><td>Search by status, priority+text, unknown service; admin overview and performance</td><td>Counts correct; average feedback 5.0</td><td>Pass</td></tr>
   <tr><td>TC-33</td><td>Exception</td><td>Unknown incident id; assign to unknown technician; switch strategy; unknown strategy</td><td>404; 404; 200 and active = LOAD_BALANCED; 404</td><td>Pass</td></tr>
 </table>

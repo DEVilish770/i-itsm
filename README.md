@@ -12,7 +12,7 @@ built to demonstrate object-oriented design on a real organisational problem.
 | Frontend | React 18 · Vite · React Router · STOMP over WebSocket |
 | Database | PostgreSQL 16 (H2 in-memory for the `dev` profile and tests) |
 | Deployment | Docker Compose (Postgres + backend + nginx-served frontend) |
-| Tests | JUnit 5 · Spring MockMvc · 44 tests / 33 documented test cases |
+| Tests | JUnit 5 · Spring MockMvc · 53 tests / 33 documented test cases |
 
 ## Quick start
 
